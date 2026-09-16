@@ -216,21 +216,36 @@ class EmployeeWebApp:
         else:
             user = "<a class='text-xs md:text-sm font-medium text-zinc-200 hover:text-white bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 px-3.5 py-1.5 rounded-lg transition' href='/login'>Sign in</a>"
 
-        # Notices / Flash alerts
-        notices_list = []
+        # Flash alerts rendered as high-contrast monochrome toasts
+        toasts_list = []
         for item in database.flash_pop(session.session_id):
             is_success = item["kind"] == "success"
-            bg_color = "bg-emerald-50 border-emerald-200 text-emerald-900" if is_success else "bg-rose-50 border-rose-200 text-rose-900"
-            icon = (
-                """<svg class='w-5 h-5 flex-shrink-0 text-emerald-600' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5 13l4 4L19 7'/></svg>"""
+            title_text = "Success" if is_success else "Notice"
+            badge_icon = (
+                """<svg class='w-3.5 h-3.5 text-white' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M5 13l4 4L19 7'/></svg>"""
                 if is_success
-                else """<svg class='w-5 h-5 flex-shrink-0 text-rose-600' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z'/></svg>"""
+                else """<svg class='w-3.5 h-3.5 text-zinc-300' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z'/></svg>"""
             )
-            notices_list.append(
-                f"<div class='mb-6 p-4 rounded-xl border flex items-center gap-3 text-sm font-medium shadow-xs {bg_color}'>"
-                f"{icon}<span>{self._e(item['message'])}</span></div>"
+            toasts_list.append(
+                f"""
+                <div class='toast-item pointer-events-auto bg-black text-white border border-zinc-800 rounded-xl shadow-2xl p-4 flex flex-col gap-2 transition-all duration-300 ease-out transform translate-x-12 opacity-0' role='alert'>
+                  <div class='flex items-start gap-3'>
+                    <span class='w-6 h-6 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center flex-shrink-0 mt-0.5'>{badge_icon}</span>
+                    <div class='flex-1 min-w-0'>
+                      <p class='text-[10px] font-bold text-zinc-400 uppercase tracking-wider'>{title_text}</p>
+                      <p class='text-xs sm:text-sm font-medium text-zinc-100 mt-0.5 leading-snug break-words'>{self._e(item['message'])}</p>
+                    </div>
+                    <button type='button' class='text-zinc-500 hover:text-white p-1 rounded-lg hover:bg-zinc-800 transition flex-shrink-0' aria-label='Dismiss' onclick='dismissToast(this.closest(".toast-item"))'>
+                      <svg class='w-3.5 h-3.5' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M6 18L18 6M6 6l12 12'/></svg>
+                    </button>
+                  </div>
+                  <div class='w-full bg-zinc-800 h-0.5 rounded-full overflow-hidden mt-1'>
+                    <div class='bg-white h-full toast-progress'></div>
+                  </div>
+                </div>
+                """
             )
-        notices = "".join(notices_list)
+        toast_container = f"<div id='toast-container' class='fixed top-5 right-5 z-50 flex flex-col gap-2.5 max-w-sm w-full pointer-events-none px-4 sm:px-0'>{''.join(toasts_list)}</div>"
 
         # Mobile navigation links
         mobile_nav = ""
@@ -271,6 +286,7 @@ class EmployeeWebApp:
   <link rel='stylesheet' href='/assets/app.css'>
 </head>
 <body class='min-h-full flex flex-col font-sans text-zinc-900 antialiased bg-zinc-50'>
+  {toast_container}
   <header class='sticky top-0 z-40 bg-black border-b border-zinc-800 text-white shadow-xs'>
     <div class='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
       <div class='flex items-center justify-between h-16 gap-4'>
@@ -293,7 +309,6 @@ class EmployeeWebApp:
     <div class='border-b border-zinc-200 pb-5 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2'>
       <h1 class='text-2xl font-bold tracking-tight text-zinc-900'>{self._e(title)}</h1>
     </div>
-    {notices}
     {content}
   </main>
 
@@ -309,6 +324,28 @@ class EmployeeWebApp:
       if (menu && menu.open && !menu.contains(e.target)) {{
         menu.removeAttribute('open');
       }}
+    }});
+
+    function dismissToast(el) {{
+      if (!el || el.dataset.dismissing) return;
+      el.dataset.dismissing = 'true';
+      el.classList.remove('translate-x-0', 'opacity-100');
+      el.classList.add('translate-x-12', 'opacity-0');
+      setTimeout(function() {{
+        if (el.parentNode) el.parentNode.removeChild(el);
+      }}, 300);
+    }}
+
+    document.querySelectorAll('.toast-item').forEach(function(el) {{
+      requestAnimationFrame(function() {{
+        setTimeout(function() {{
+          el.classList.remove('translate-x-12', 'opacity-0');
+          el.classList.add('translate-x-0', 'opacity-100');
+        }}, 50);
+      }});
+      setTimeout(function() {{
+        dismissToast(el);
+      }}, 3000);
     }});
   </script>
 </body>
@@ -1216,6 +1253,17 @@ details > summary::after {
 }
 pre {
   tab-size: 2;
+}
+@keyframes toast-progress {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+.toast-progress {
+  animation: toast-progress 3s linear forwards;
 }
 @media print {
   header, footer, nav, button {
