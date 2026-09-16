@@ -3,7 +3,7 @@
 Run with ``python3 main.py`` and visit http://127.0.0.1:8000.  This module
 uses only the Python standard library; the existing domain services continue
 to own employee, attendance, payroll, reporting, and authentication logic.
-Styled with modern, responsive Tailwind CSS via CDN.
+Styled with modern, responsive, monochrome black-and-white Tailwind CSS via CDN.
 """
 
 from __future__ import annotations
@@ -55,10 +55,10 @@ class EmployeeWebApp:
             # Do not leak implementation details in browser responses.
             response = self._page(
                 "Unexpected error",
-                "<div class='bg-white rounded-2xl border border-slate-200 p-8 text-center max-w-md mx-auto shadow-xs'>"
-                "<h3 class='text-base font-bold text-slate-900'>Something went wrong</h3>"
-                "<p class='text-slate-600 text-sm mt-1.5'>We could not complete that request. Please try again.</p>"
-                "<a href='/' class='inline-block mt-4 bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium px-4 py-2 rounded-lg transition'>Return to Home</a>"
+                "<div class='bg-white rounded-2xl border border-zinc-200 p-8 text-center max-w-md mx-auto shadow-xs'>"
+                "<h3 class='text-base font-bold text-zinc-900'>Something went wrong</h3>"
+                "<p class='text-zinc-600 text-sm mt-1.5'>We could not complete that request. Please try again.</p>"
+                "<a href='/' class='inline-block mt-4 bg-black hover:bg-zinc-800 text-white text-xs font-medium px-4 py-2 rounded-lg transition'>Return to Home</a>"
                 "</div>",
                 current,
                 browser_session,
@@ -156,8 +156,8 @@ class EmployeeWebApp:
         if current:
             def nav_link(href: str, label: str, active: bool) -> str:
                 if active:
-                    return f"<a href='{href}' class='bg-slate-800 text-white px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium transition shadow-xs'>{label}</a>"
-                return f"<a href='{href}' class='text-slate-300 hover:text-white hover:bg-slate-800/60 px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium transition'>{label}</a>"
+                    return f"<a href='{href}' class='bg-zinc-800 text-white px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium transition shadow-xs'>{label}</a>"
+                return f"<a href='{href}' class='text-zinc-400 hover:text-white hover:bg-zinc-900 px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium transition'>{label}</a>"
 
             links = [
                 nav_link("/employees", "Employees", title == "Employees"),
@@ -170,26 +170,51 @@ class EmployeeWebApp:
                 links.append(nav_link("/users", "User Accounts", title == "User accounts"))
 
             nav = f"<nav class='hidden md:flex items-center gap-1.5 flex-1'>{''.join(links)}</nav>"
-            role_badge = (
-                "bg-rose-500/10 text-rose-400 border-rose-500/30"
+
+            role_badge_dropdown = (
+                "bg-zinc-900 text-white border-zinc-700"
                 if current.role == "Admin"
-                else "bg-sky-500/10 text-sky-400 border-sky-500/30"
+                else "bg-zinc-100 text-zinc-800 border-zinc-300"
             )
+
+            # Custom profile dropdown: shows details and houses the sign-out button exclusively
             user = f"""
-            <div class='flex items-center gap-3'>
-              <div class='flex items-center gap-2'>
-                <span class='w-7 h-7 rounded-full bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold flex items-center justify-center'>{self._e(current.username[:1].upper())}</span>
-                <span class='text-xs md:text-sm font-medium text-slate-200 hidden sm:inline'>{self._e(current.username)}</span>
-                <span class='text-[10px] md:text-xs font-semibold px-2 py-0.5 rounded-full border {role_badge}'>{self._e(current.role)}</span>
-              </div>
-              <form class='inline' method='post' action='/logout'>
-                {self._csrf(session)}
-                <button class='text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-lg transition'>Sign out</button>
-              </form>
+            <div class='relative' id='user-profile-menu'>
+              <details class='group relative list-none'>
+                <summary class='cursor-pointer flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-zinc-900 border border-transparent hover:border-zinc-800 transition select-none list-none [&::-webkit-details-marker]:hidden'>
+                  <span class='w-7 h-7 rounded-full bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs font-bold flex items-center justify-center'>{self._e(current.username[:1].upper())}</span>
+                  <div class='text-left hidden sm:block'>
+                    <div class='text-xs font-semibold text-zinc-200 leading-tight'>{self._e(current.username)}</div>
+                    <div class='text-[10px] text-zinc-400 leading-tight capitalize'>{self._e(current.role)}</div>
+                  </div>
+                  <svg class='w-3.5 h-3.5 text-zinc-400 group-open:rotate-180 transition-transform duration-200 ml-0.5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                    <path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/>
+                  </svg>
+                </summary>
+                <div class='absolute right-0 top-full mt-2 w-60 bg-white text-zinc-900 rounded-2xl border border-zinc-200 shadow-xl py-2 z-50 divide-y divide-zinc-100'>
+                  <div class='px-4 py-3'>
+                    <p class='text-[10px] font-semibold text-zinc-400 uppercase tracking-wider'>Signed in as</p>
+                    <p class='text-sm font-bold text-zinc-900 truncate mt-0.5'>{self._e(current.username)}</p>
+                    <div class='flex items-center gap-2 mt-2'>
+                      <span class='text-[10px] font-semibold px-2 py-0.5 rounded-full border {role_badge_dropdown}'>{self._e(current.role)}</span>
+                      {f"<span class='text-[11px] text-zinc-500 font-mono'>{self._e(current.employee_id)}</span>" if current.employee_id else ""}
+                    </div>
+                  </div>
+                  <div class='py-1'>
+                    <form method='post' action='/logout' class='w-full'>
+                      {self._csrf(session)}
+                      <button class='w-full text-left flex items-center gap-2 px-4 py-2 text-xs font-medium text-red-600 hover:bg-red-50 hover:text-red-700 transition'>
+                        <svg class='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1'/></svg>
+                        Sign out
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              </details>
             </div>
             """
         else:
-            user = "<a class='text-xs md:text-sm font-medium text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3.5 py-1.5 rounded-lg transition' href='/login'>Sign in</a>"
+            user = "<a class='text-xs md:text-sm font-medium text-zinc-200 hover:text-white bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 px-3.5 py-1.5 rounded-lg transition' href='/login'>Sign in</a>"
 
         # Notices / Flash alerts
         notices_list = []
@@ -207,22 +232,22 @@ class EmployeeWebApp:
             )
         notices = "".join(notices_list)
 
-        # Mobile navigation links for small viewports
+        # Mobile navigation links
         mobile_nav = ""
         if current:
             mobile_links = [
-                f"<a href='/employees' class='text-xs font-medium text-slate-300 hover:text-white px-2 py-1'>Employees</a>",
-                f"<a href='/attendance' class='text-xs font-medium text-slate-300 hover:text-white px-2 py-1'>Attendance</a>",
-                f"<a href='/payroll' class='text-xs font-medium text-slate-300 hover:text-white px-2 py-1'>Payroll</a>",
+                f"<a href='/employees' class='text-xs font-medium text-zinc-300 hover:text-white px-2 py-1'>Employees</a>",
+                f"<a href='/attendance' class='text-xs font-medium text-zinc-300 hover:text-white px-2 py-1'>Attendance</a>",
+                f"<a href='/payroll' class='text-xs font-medium text-zinc-300 hover:text-white px-2 py-1'>Payroll</a>",
             ]
             if self.auth.has_permission(session.auth_token or "", Permission.VIEW_REPORTS):
-                mobile_links.append("<a href='/reports' class='text-xs font-medium text-slate-300 hover:text-white px-2 py-1'>Reports</a>")
+                mobile_links.append("<a href='/reports' class='text-xs font-medium text-zinc-300 hover:text-white px-2 py-1'>Reports</a>")
             if self.auth.has_permission(session.auth_token or "", Permission.ADD_EMPLOYEE):
-                mobile_links.append("<a href='/users' class='text-xs font-medium text-slate-300 hover:text-white px-2 py-1'>Users</a>")
-            mobile_nav = f"<div class='flex md:hidden items-center gap-2 overflow-x-auto py-2 border-t border-slate-800 mt-2.5 w-full'>{''.join(mobile_links)}</div>"
+                mobile_links.append("<a href='/users' class='text-xs font-medium text-zinc-300 hover:text-white px-2 py-1'>Users</a>")
+            mobile_nav = f"<div class='flex md:hidden items-center gap-2 overflow-x-auto py-2 border-t border-zinc-800 mt-2.5 w-full'>{''.join(mobile_links)}</div>"
 
         page = f"""<!doctype html>
-<html lang='en' class='h-full bg-slate-50'>
+<html lang='en' class='h-full bg-zinc-50'>
 <head>
   <meta charset='utf-8'>
   <meta name='viewport' content='width=device-width, initial-scale=1'>
@@ -245,13 +270,13 @@ class EmployeeWebApp:
   </script>
   <link rel='stylesheet' href='/assets/app.css'>
 </head>
-<body class='min-h-full flex flex-col font-sans text-slate-900 antialiased bg-slate-50'>
-  <header class='sticky top-0 z-40 bg-slate-900 border-b border-slate-800 text-white shadow-xs'>
+<body class='min-h-full flex flex-col font-sans text-zinc-900 antialiased bg-zinc-50'>
+  <header class='sticky top-0 z-40 bg-black border-b border-zinc-800 text-white shadow-xs'>
     <div class='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
       <div class='flex items-center justify-between h-16 gap-4'>
         <div class='flex items-center gap-4 md:gap-8'>
           <a href='/' class='flex items-center gap-2 text-base md:text-lg font-bold text-white tracking-tight hover:opacity-95 transition'>
-            <span class='w-7 h-7 md:w-8 md:h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white text-xs md:text-sm font-black shadow-inner'>EMS</span>
+            <span class='w-7 h-7 md:w-8 md:h-8 rounded-lg bg-white text-black flex items-center justify-center text-xs md:text-sm font-black shadow-inner'>EMS</span>
             <span>{APP_NAME}</span>
           </a>
           {nav}
@@ -265,18 +290,27 @@ class EmployeeWebApp:
   </header>
 
   <main class='flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8'>
-    <div class='border-b border-slate-200 pb-5 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2'>
-      <h1 class='text-2xl font-bold tracking-tight text-slate-900'>{self._e(title)}</h1>
+    <div class='border-b border-zinc-200 pb-5 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2'>
+      <h1 class='text-2xl font-bold tracking-tight text-zinc-900'>{self._e(title)}</h1>
     </div>
     {notices}
     {content}
   </main>
 
-  <footer class='border-t border-slate-200 bg-white py-6 mt-12 text-center text-xs text-slate-500'>
+  <footer class='border-t border-zinc-200 bg-white py-6 mt-12 text-center text-xs text-zinc-500'>
     <div class='max-w-7xl mx-auto px-4'>
       <p>{APP_NAME} &middot; Enterprise Human Resources &amp; Workforce Management Platform &middot; All records secured via server-side RBAC.</p>
     </div>
   </footer>
+
+  <script>
+    document.addEventListener('click', function(e) {{
+      const menu = document.querySelector('#user-profile-menu details');
+      if (menu && menu.open && !menu.contains(e.target)) {{
+        menu.removeAttribute('open');
+      }}
+    }});
+  </script>
 </body>
 </html>"""
         return status, [], page
@@ -290,25 +324,25 @@ class EmployeeWebApp:
 
     @staticmethod
     def _table(headers: List[str], rows: List[List[object]]) -> str:
-        head = "".join(f"<th class='px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider'>{html.escape(header)}</th>" for header in headers)
+        head = "".join(f"<th class='px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider'>{html.escape(header)}</th>" for header in headers)
         body = "".join(
-            "<tr class='hover:bg-slate-50/70 transition-colors'>"
+            "<tr class='hover:bg-zinc-50/70 transition-colors'>"
             + "".join(
-                f"<td class='px-4 py-3.5 text-slate-700 whitespace-nowrap'>{cell if isinstance(cell, str) and cell.startswith('<') else html.escape(str(cell))}</td>"
+                f"<td class='px-4 py-3.5 text-zinc-700 whitespace-nowrap'>{cell if isinstance(cell, str) and cell.startswith('<') else html.escape(str(cell))}</td>"
                 for cell in row
             )
             + "</tr>"
             for row in rows
         )
-        empty_row = f"<tr><td colspan='{len(headers)}' class='px-6 py-10 text-center text-slate-400 italic text-sm'>No records found.</td></tr>"
+        empty_row = f"<tr><td colspan='{len(headers)}' class='px-6 py-10 text-center text-zinc-400 italic text-sm'>No records found.</td></tr>"
         return f"""
-        <div class='overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs'>
+        <div class='overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-xs'>
           <div class='overflow-x-auto'>
-            <table class='min-w-full divide-y divide-slate-200 text-sm'>
-              <thead class='bg-slate-50/80'>
+            <table class='min-w-full divide-y divide-zinc-200 text-sm'>
+              <thead class='bg-zinc-50/80'>
                 <tr>{head}</tr>
               </thead>
-              <tbody class='divide-y divide-slate-100 bg-white'>
+              <tbody class='divide-y divide-zinc-100 bg-white'>
                 {body or empty_row}
               </tbody>
             </table>
@@ -348,10 +382,10 @@ class EmployeeWebApp:
             return self._users(request, session, current)
         return self._page(
             "Page not found",
-            "<div class='bg-white rounded-2xl border border-slate-200 p-8 text-center max-w-md mx-auto shadow-xs'>"
-            "<h3 class='text-lg font-bold text-slate-900'>404 &middot; Not Found</h3>"
-            "<p class='text-slate-600 text-sm mt-1.5'>The requested page does not exist.</p>"
-            "<a href='/' class='inline-block mt-4 bg-slate-900 text-white text-xs font-medium px-4 py-2 rounded-lg'>Go Home</a>"
+            "<div class='bg-white rounded-2xl border border-zinc-200 p-8 text-center max-w-md mx-auto shadow-xs'>"
+            "<h3 class='text-lg font-bold text-zinc-900'>404 &middot; Not Found</h3>"
+            "<p class='text-zinc-600 text-sm mt-1.5'>The requested page does not exist.</p>"
+            "<a href='/' class='inline-block mt-4 bg-black text-white text-xs font-medium px-4 py-2 rounded-lg'>Go Home</a>"
             "</div>",
             current,
             session,
@@ -375,30 +409,30 @@ class EmployeeWebApp:
                 return self._redirect("/login", session)
         content = f"""
         <div class='min-h-[calc(100vh-220px)] flex items-center justify-center py-6'>
-          <div class='w-full max-w-md bg-white rounded-2xl border border-slate-200 p-8 shadow-sm'>
+          <div class='w-full max-w-md bg-white rounded-2xl border border-zinc-200 p-8 shadow-sm'>
             <div class='text-center mb-6'>
-              <div class='inline-flex items-center justify-center w-12 h-12 rounded-xl bg-slate-900 text-white font-black text-lg mb-3 shadow-sm'>EMS</div>
-              <h2 class='text-xl font-bold text-slate-900 tracking-tight'>Sign in to your workspace</h2>
-              <p class='text-xs text-slate-500 mt-1'>Secure access to employee, attendance, and payroll operations.</p>
+              <div class='inline-flex items-center justify-center w-12 h-12 rounded-xl bg-black text-white font-black text-lg mb-3 shadow-sm'>EMS</div>
+              <h2 class='text-xl font-bold text-zinc-900 tracking-tight'>Sign in to your workspace</h2>
+              <p class='text-xs text-zinc-500 mt-1'>Secure access to employee, attendance, and payroll operations.</p>
             </div>
             <form method='post' class='space-y-4'>
               {self._csrf(session)}
               <div>
-                <label class='block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5'>Username</label>
-                <input name='username' autocomplete='username' required maxlength='50' class='w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-slate-900 focus:border-slate-900 focus:outline-none transition text-sm' placeholder='e.g. admin'>
+                <label class='block text-xs font-semibold text-zinc-700 uppercase tracking-wider mb-1.5'>Username</label>
+                <input name='username' autocomplete='username' required maxlength='50' class='w-full px-3.5 py-2.5 rounded-lg border border-zinc-300 text-zinc-900 placeholder-zinc-400 focus:ring-2 focus:ring-black focus:border-black focus:outline-none transition text-sm' placeholder='e.g. admin'>
               </div>
               <div>
-                <label class='block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5'>Password</label>
-                <input name='password' type='password' autocomplete='current-password' required class='w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-slate-900 focus:border-slate-900 focus:outline-none transition text-sm' placeholder='••••••••'>
+                <label class='block text-xs font-semibold text-zinc-700 uppercase tracking-wider mb-1.5'>Password</label>
+                <input name='password' type='password' autocomplete='current-password' required class='w-full px-3.5 py-2.5 rounded-lg border border-zinc-300 text-zinc-900 placeholder-zinc-400 focus:ring-2 focus:ring-black focus:border-black focus:outline-none transition text-sm' placeholder='••••••••'>
               </div>
-              <button class='w-full bg-slate-900 hover:bg-slate-800 text-white font-medium py-2.5 px-4 rounded-lg shadow-sm transition text-sm'>Sign in</button>
+              <button class='w-full bg-black hover:bg-zinc-800 text-white font-medium py-2.5 px-4 rounded-lg shadow-sm transition text-sm'>Sign in</button>
             </form>
-            <div class='mt-6 pt-5 border-t border-slate-100 flex items-start gap-2.5 text-xs text-slate-500 bg-slate-50 p-3.5 rounded-xl border border-slate-200/60'>
-              <svg class='w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z'/></svg>
+            <div class='mt-6 pt-5 border-t border-zinc-100 flex items-start gap-2.5 text-xs text-zinc-500 bg-zinc-50 p-3.5 rounded-xl border border-zinc-200/60'>
+              <svg class='w-4 h-4 text-zinc-400 flex-shrink-0 mt-0.5' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z'/></svg>
               <div>
-                <p class='font-semibold text-slate-700'>Default Seed Credentials</p>
-                <p class='mt-0.5'>Administrator: <code class='font-mono font-bold text-slate-800'>admin</code> / <code class='font-mono font-bold text-slate-800'>admin</code></p>
-                <p class='mt-0.5 text-slate-400'>5 failed attempts locks sign-in for 15 minutes. Sessions expire after 30 minutes.</p>
+                <p class='font-semibold text-zinc-700'>Default Seed Credentials</p>
+                <p class='mt-0.5'>Administrator: <code class='font-mono font-bold text-zinc-900'>admin</code> / <code class='font-mono font-bold text-zinc-900'>admin</code></p>
+                <p class='mt-0.5 text-zinc-400'>5 failed attempts locks sign-in for 15 minutes. Sessions expire after 30 minutes.</p>
               </div>
             </div>
           </div>
@@ -409,41 +443,41 @@ class EmployeeWebApp:
     def _dashboard(self, current, session: BrowserSession):
         records = employees.get_all_employees()
         counts = [
-            ("Total Employees", len(records), "Active workforce records in directory", "bg-indigo-50 text-indigo-700 border-indigo-200"),
-            ("Attendance Entries", len(self.attendance.get_all_attendance()), "Recorded daily presence / absence logs", "bg-emerald-50 text-emerald-700 border-emerald-200"),
-            ("Leave Requests", len(self.leaves.get_leave_requests()), "Pending, approved, & historic requests", "bg-amber-50 text-amber-700 border-amber-200"),
+            ("Total Employees", len(records), "Active workforce records in directory", "bg-zinc-100 text-zinc-800 border-zinc-200"),
+            ("Attendance Entries", len(self.attendance.get_all_attendance()), "Recorded daily presence / absence logs", "bg-zinc-100 text-zinc-800 border-zinc-200"),
+            ("Leave Requests", len(self.leaves.get_leave_requests()), "Pending, approved, & historic requests", "bg-zinc-100 text-zinc-800 border-zinc-200"),
         ]
         cards = "".join(
             f"""
-            <div class='bg-white p-6 rounded-2xl border border-slate-200 shadow-xs hover:border-slate-300 transition'>
+            <div class='bg-white p-6 rounded-2xl border border-zinc-200 shadow-xs hover:border-zinc-300 transition'>
               <div class='flex items-center justify-between'>
-                <span class='text-xs font-semibold uppercase tracking-wider text-slate-500'>{label}</span>
+                <span class='text-xs font-semibold uppercase tracking-wider text-zinc-500'>{label}</span>
                 <span class='text-[10px] font-semibold px-2 py-0.5 rounded-full border {badge_style}'>Live Database</span>
               </div>
-              <div class='text-3xl font-extrabold text-slate-900 tracking-tight mt-3'>{count}</div>
-              <p class='text-xs text-slate-500 mt-1.5'>{sub}</p>
+              <div class='text-3xl font-extrabold text-zinc-900 tracking-tight mt-3'>{count}</div>
+              <p class='text-xs text-zinc-500 mt-1.5'>{sub}</p>
             </div>
             """
             for label, count, sub, badge_style in counts
         )
 
         perm_tags = "".join(
-            f"<span class='inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-slate-50 text-slate-700 border border-slate-200'><svg class='w-3.5 h-3.5 text-emerald-600' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5 13l4 4L19 7'/></svg>{self._e(p)}</span>"
+            f"<span class='inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-zinc-50 text-zinc-800 border border-zinc-200'><svg class='w-3.5 h-3.5 text-zinc-700' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5 13l4 4L19 7'/></svg>{self._e(p)}</span>"
             for p in current.permissions
-        ) or "<span class='text-xs text-slate-400 italic'>No specific permissions assigned.</span>"
+        ) or "<span class='text-xs text-zinc-400 italic'>No specific permissions assigned.</span>"
 
-        role_badge = "bg-rose-50 text-rose-700 border-rose-200" if current.role == "Admin" else "bg-sky-50 text-sky-700 border-sky-200"
+        role_badge = "bg-zinc-900 text-white border-zinc-700" if current.role == "Admin" else "bg-zinc-100 text-zinc-800 border-zinc-300"
 
         content = f"""
         <div class='space-y-8'>
-          <div class='bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4'>
+          <div class='bg-white p-6 rounded-2xl border border-zinc-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4'>
             <div>
-              <h2 class='text-lg font-bold text-slate-900 tracking-tight'>Welcome back, {self._e(current.username)}!</h2>
-              <p class='text-xs text-slate-500 mt-1'>Logged in as <span class='font-semibold text-slate-700'>{self._e(current.role)}</span>. Your session is protected by cryptographic cookies and strict CSRF tokens.</p>
+              <h2 class='text-lg font-bold text-zinc-900 tracking-tight'>Welcome back, {self._e(current.username)}!</h2>
+              <p class='text-xs text-zinc-500 mt-1'>Logged in as <span class='font-semibold text-zinc-800'>{self._e(current.role)}</span>. All requests are protected by server-side RBAC validation and strict CSRF tokens.</p>
             </div>
             <div class='flex items-center gap-2'>
-              <a href='/employees' class='bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium px-4 py-2 rounded-lg transition shadow-xs'>Employee Directory</a>
-              <a href='/attendance' class='bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-medium px-4 py-2 rounded-lg transition shadow-xs'>Attendance & Leave</a>
+              <a href='/employees' class='bg-black hover:bg-zinc-800 text-white text-xs font-medium px-4 py-2 rounded-lg transition shadow-xs'>Employee Directory</a>
+              <a href='/attendance' class='bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-300 text-xs font-medium px-4 py-2 rounded-lg transition shadow-xs'>Attendance & Leave</a>
             </div>
           </div>
 
@@ -451,11 +485,11 @@ class EmployeeWebApp:
             {cards}
           </div>
 
-          <div class='bg-white p-6 rounded-2xl border border-slate-200 shadow-xs'>
-            <div class='flex items-center justify-between pb-4 border-b border-slate-100'>
+          <div class='bg-white p-6 rounded-2xl border border-zinc-200 shadow-xs'>
+            <div class='flex items-center justify-between pb-4 border-b border-zinc-100'>
               <div>
-                <h3 class='text-sm font-bold text-slate-900 uppercase tracking-wider'>Your Access & Permissions</h3>
-                <p class='text-xs text-slate-500 mt-0.5'>Active role security profile evaluated by server-side authorizer.</p>
+                <h3 class='text-sm font-bold text-zinc-900 uppercase tracking-wider'>Your Access & Permissions</h3>
+                <p class='text-xs text-zinc-500 mt-0.5'>Active role security profile evaluated by server-side authorizer.</p>
               </div>
               <span class='px-3 py-1 rounded-full text-xs font-semibold border {role_badge}'>{self._e(current.role)} Role</span>
             </div>
@@ -528,39 +562,39 @@ class EmployeeWebApp:
             if is_admin:
                 action = f"""
                 <details class='relative inline-block text-left'>
-                  <summary class='cursor-pointer inline-flex items-center gap-1 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-md transition select-none'>
+                  <summary class='cursor-pointer inline-flex items-center gap-1 text-xs font-semibold text-zinc-800 bg-zinc-100 hover:bg-zinc-200 px-2.5 py-1 rounded-md transition select-none'>
                     Edit &middot; Actions
                   </summary>
-                  <div class='absolute right-0 top-full mt-2 w-72 bg-white rounded-xl border border-slate-200 shadow-xl p-4 z-20'>
+                  <div class='absolute right-0 top-full mt-2 w-72 bg-white rounded-xl border border-zinc-200 shadow-xl p-4 z-20'>
                     <form method='post' class='space-y-2.5'>
                       {self._csrf(session)}
                       <input name='action' value='update' type='hidden'>
                       <input name='employee_id' value='{self._e(item['id'])}' type='hidden'>
                       <div>
-                        <label class='block text-[11px] font-semibold text-slate-600 mb-0.5'>Full Name</label>
-                        <input name='name' value='{self._e(item['name'])}' required class='w-full px-2.5 py-1.5 text-xs rounded-md border border-slate-300 focus:ring-1 focus:ring-slate-900 focus:outline-none'>
+                        <label class='block text-[11px] font-semibold text-zinc-600 mb-0.5'>Full Name</label>
+                        <input name='name' value='{self._e(item['name'])}' required class='w-full px-2.5 py-1.5 text-xs rounded-md border border-zinc-300 focus:ring-1 focus:ring-black focus:outline-none'>
                       </div>
                       <div>
-                        <label class='block text-[11px] font-semibold text-slate-600 mb-0.5'>Email</label>
-                        <input name='email' value='{self._e(item['email'])}' class='w-full px-2.5 py-1.5 text-xs rounded-md border border-slate-300 focus:ring-1 focus:ring-slate-900 focus:outline-none'>
+                        <label class='block text-[11px] font-semibold text-zinc-600 mb-0.5'>Email</label>
+                        <input name='email' value='{self._e(item['email'])}' class='w-full px-2.5 py-1.5 text-xs rounded-md border border-zinc-300 focus:ring-1 focus:ring-black focus:outline-none'>
                       </div>
                       <div>
-                        <label class='block text-[11px] font-semibold text-slate-600 mb-0.5'>Phone</label>
-                        <input name='phone' value='{self._e(item['phone'])}' class='w-full px-2.5 py-1.5 text-xs rounded-md border border-slate-300 focus:ring-1 focus:ring-slate-900 focus:outline-none'>
+                        <label class='block text-[11px] font-semibold text-zinc-600 mb-0.5'>Phone</label>
+                        <input name='phone' value='{self._e(item['phone'])}' class='w-full px-2.5 py-1.5 text-xs rounded-md border border-zinc-300 focus:ring-1 focus:ring-black focus:outline-none'>
                       </div>
                       <div>
-                        <label class='block text-[11px] font-semibold text-slate-600 mb-0.5'>Department</label>
-                        <input name='department' value='{self._e(item['department'])}' class='w-full px-2.5 py-1.5 text-xs rounded-md border border-slate-300 focus:ring-1 focus:ring-slate-900 focus:outline-none'>
+                        <label class='block text-[11px] font-semibold text-zinc-600 mb-0.5'>Department</label>
+                        <input name='department' value='{self._e(item['department'])}' class='w-full px-2.5 py-1.5 text-xs rounded-md border border-zinc-300 focus:ring-1 focus:ring-black focus:outline-none'>
                       </div>
                       <div>
-                        <label class='block text-[11px] font-semibold text-slate-600 mb-0.5'>Designation</label>
-                        <input name='designation' value='{self._e(item['designation'])}' class='w-full px-2.5 py-1.5 text-xs rounded-md border border-slate-300 focus:ring-1 focus:ring-slate-900 focus:outline-none'>
+                        <label class='block text-[11px] font-semibold text-zinc-600 mb-0.5'>Designation</label>
+                        <input name='designation' value='{self._e(item['designation'])}' class='w-full px-2.5 py-1.5 text-xs rounded-md border border-zinc-300 focus:ring-1 focus:ring-black focus:outline-none'>
                       </div>
-                      <div class='flex items-center justify-between pt-2 border-t border-slate-100'>
-                        <button class='bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium px-3 py-1.5 rounded-md transition'>Save Updates</button>
+                      <div class='flex items-center justify-between pt-2 border-t border-zinc-100'>
+                        <button class='bg-black hover:bg-zinc-800 text-white text-xs font-medium px-3 py-1.5 rounded-md transition'>Save Updates</button>
                       </div>
                     </form>
-                    <form method='post' class='mt-2 pt-2 border-t border-slate-100 flex justify-end'>
+                    <form method='post' class='mt-2 pt-2 border-t border-zinc-100 flex justify-end'>
                       {self._csrf(session)}
                       <input name='action' value='delete' type='hidden'>
                       <input name='employee_id' value='{self._e(item['id'])}' type='hidden'>
@@ -569,47 +603,47 @@ class EmployeeWebApp:
                   </div>
                 </details>
                 """
-            emp_badge = f"<span class='font-mono text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200'>{self._e(item['id'])}</span>"
-            dept_badge = f"<span class='inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100'>{self._e(item['department'])}</span>"
+            emp_badge = f"<span class='font-mono text-xs font-semibold px-2 py-0.5 rounded bg-zinc-100 text-zinc-800 border border-zinc-200'>{self._e(item['id'])}</span>"
+            dept_badge = f"<span class='inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-zinc-100 text-zinc-800 border border-zinc-200'>{self._e(item['department'])}</span>"
             rows.append([emp_badge, item["name"], item["email"] or "—", item["phone"] or "—", dept_badge, item["designation"], action])
 
         add_form = ""
         if is_admin:
             add_form = f"""
-            <div class='bg-white p-6 rounded-2xl border border-slate-200 shadow-xs mb-8'>
-              <h2 class='text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2'>
-                <span class='w-2 h-2 rounded-full bg-emerald-500'></span>
+            <div class='bg-white p-6 rounded-2xl border border-zinc-200 shadow-xs mb-8'>
+              <h2 class='text-sm font-bold text-zinc-900 uppercase tracking-wider mb-4 flex items-center gap-2'>
+                <span class='w-2 h-2 rounded-full bg-black'></span>
                 Add New Employee
               </h2>
               <form method='post' class='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'>
                 {self._csrf(session)}
                 <input type='hidden' name='action' value='add'>
                 <div>
-                  <label class='block text-xs font-semibold text-slate-700 mb-1'>Employee ID</label>
-                  <input name='employee_id' placeholder='Auto-generated if blank' class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none'>
+                  <label class='block text-xs font-semibold text-zinc-700 mb-1'>Employee ID</label>
+                  <input name='employee_id' placeholder='Auto-generated if blank' class='w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 focus:ring-2 focus:ring-black focus:outline-none'>
                 </div>
                 <div>
-                  <label class='block text-xs font-semibold text-slate-700 mb-1'>Full Name *</label>
-                  <input name='name' required class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none' placeholder='e.g. Ananya Sharma'>
+                  <label class='block text-xs font-semibold text-zinc-700 mb-1'>Full Name *</label>
+                  <input name='name' required class='w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 focus:ring-2 focus:ring-black focus:outline-none' placeholder='e.g. Ananya Sharma'>
                 </div>
                 <div>
-                  <label class='block text-xs font-semibold text-slate-700 mb-1'>Email Address</label>
-                  <input name='email' type='email' class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none' placeholder='name@company.com'>
+                  <label class='block text-xs font-semibold text-zinc-700 mb-1'>Email Address</label>
+                  <input name='email' type='email' class='w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 focus:ring-2 focus:ring-black focus:outline-none' placeholder='name@company.com'>
                 </div>
                 <div>
-                  <label class='block text-xs font-semibold text-slate-700 mb-1'>Phone Number</label>
-                  <input name='phone' class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none' placeholder='+91 98765 43210'>
+                  <label class='block text-xs font-semibold text-zinc-700 mb-1'>Phone Number</label>
+                  <input name='phone' class='w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 focus:ring-2 focus:ring-black focus:outline-none' placeholder='+91 98765 43210'>
                 </div>
                 <div>
-                  <label class='block text-xs font-semibold text-slate-700 mb-1'>Department *</label>
-                  <input name='department' required class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none' placeholder='e.g. Engineering'>
+                  <label class='block text-xs font-semibold text-zinc-700 mb-1'>Department *</label>
+                  <input name='department' required class='w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 focus:ring-2 focus:ring-black focus:outline-none' placeholder='e.g. Engineering'>
                 </div>
                 <div>
-                  <label class='block text-xs font-semibold text-slate-700 mb-1'>Designation *</label>
-                  <input name='designation' required class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none' placeholder='e.g. Senior Software Engineer'>
+                  <label class='block text-xs font-semibold text-zinc-700 mb-1'>Designation *</label>
+                  <input name='designation' required class='w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 focus:ring-2 focus:ring-black focus:outline-none' placeholder='e.g. Senior Software Engineer'>
                 </div>
                 <div class='sm:col-span-2 lg:col-span-3 pt-2'>
-                  <button class='bg-slate-900 hover:bg-slate-800 text-white font-medium px-5 py-2.5 rounded-lg text-sm transition shadow-xs'>Save Employee Record</button>
+                  <button class='bg-black hover:bg-zinc-800 text-white font-medium px-5 py-2.5 rounded-lg text-sm transition shadow-xs'>Save Employee Record</button>
                 </div>
               </form>
             </div>
@@ -619,17 +653,17 @@ class EmployeeWebApp:
         <div class='flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6'>
           <form class='flex items-center gap-2 max-w-md w-full' method='get'>
             <div class='relative flex-1'>
-              <input name='q' value='{self._e(keyword)}' placeholder='Search by name, ID, department...' class='w-full pl-9 pr-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-slate-900 focus:outline-none'>
-              <svg class='w-4 h-4 text-slate-400 absolute left-3 top-2.5' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z'/></svg>
+              <input name='q' value='{self._e(keyword)}' placeholder='Search by name, ID, department...' class='w-full pl-9 pr-3 py-2 rounded-lg border border-zinc-300 text-sm focus:ring-2 focus:ring-black focus:outline-none'>
+              <svg class='w-4 h-4 text-zinc-400 absolute left-3 top-2.5' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z'/></svg>
             </div>
-            <button class='bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition'>Search</button>
-            {f"<a href='/employees' class='text-xs text-slate-500 hover:text-slate-800 underline px-2'>Reset</a>" if keyword else ""}
+            <button class='bg-black hover:bg-zinc-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition'>Search</button>
+            {f"<a href='/employees' class='text-xs text-zinc-500 hover:text-zinc-800 underline px-2'>Reset</a>" if keyword else ""}
           </form>
-          <div class='text-xs font-medium text-slate-500'>Showing {len(data)} employee record(s)</div>
+          <div class='text-xs font-medium text-zinc-500'>Showing {len(data)} employee record(s)</div>
         </div>
         """
 
-        content = f"{search_bar}{add_form}<div class='space-y-3'><h2 class='text-sm font-bold text-slate-900 uppercase tracking-wider'>Directory Listing</h2>{self._table(['ID', 'Name', 'Email', 'Phone', 'Department', 'Designation', 'Actions'], rows)}</div>"
+        content = f"{search_bar}{add_form}<div class='space-y-3'><h2 class='text-sm font-bold text-zinc-900 uppercase tracking-wider'>Directory Listing</h2>{self._table(['ID', 'Name', 'Email', 'Phone', 'Department', 'Designation', 'Actions'], rows)}</div>"
         return self._page("Employees", content, current, session)
 
     # ------------------------ Attendance and leave --------------------------
@@ -694,12 +728,12 @@ class EmployeeWebApp:
         for record in attendance_data:
             st = record.status
             st_badge = (
-                "<span class='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200'>Present</span>"
+                "<span class='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200'>Present</span>"
                 if st == "Present"
-                else "<span class='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200'>Absent</span>"
+                else "<span class='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-800 border border-rose-200'>Absent</span>"
             )
             attendance_rows.append([
-                f"<span class='font-mono text-xs font-medium text-slate-700'>{record.employee_id}</span>",
+                f"<span class='font-mono text-xs font-medium text-zinc-700'>{record.employee_id}</span>",
                 self._employee_name(record.employee_id),
                 str(record.date),
                 st_badge,
@@ -727,14 +761,14 @@ class EmployeeWebApp:
                 """
             st = record.status
             if st == "Approved":
-                st_badge = "<span class='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200'>Approved</span>"
+                st_badge = "<span class='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200'>Approved</span>"
             elif st == "Rejected":
-                st_badge = "<span class='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200'>Rejected</span>"
+                st_badge = "<span class='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-800 border border-rose-200'>Rejected</span>"
             else:
-                st_badge = "<span class='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200'>Pending</span>"
+                st_badge = "<span class='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200'>Pending</span>"
 
             leave_rows.append([
-                f"<span class='font-mono text-xs font-semibold text-slate-700'>{record.request_id}</span>",
+                f"<span class='font-mono text-xs font-semibold text-zinc-700'>{record.request_id}</span>",
                 self._employee_name(record.employee_id),
                 str(record.start_date),
                 str(record.end_date),
@@ -746,35 +780,35 @@ class EmployeeWebApp:
         mark_form = ""
         if self.auth.has_permission(session.auth_token or "", Permission.MARK_ATTENDANCE):
             select = (
-                f"<select name='employee_id' class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-slate-900 focus:outline-none'>{self._employee_options()}</select>"
+                f"<select name='employee_id' class='w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 bg-white focus:ring-2 focus:ring-black focus:outline-none'>{self._employee_options()}</select>"
                 if is_admin
-                else f"<div class='px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-800'>{self._e(current.employee_id or 'Unlinked account')}</div>"
+                else f"<div class='px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-sm font-medium text-zinc-800'>{self._e(current.employee_id or 'Unlinked account')}</div>"
             )
             mark_form = f"""
-            <div class='bg-white p-6 rounded-2xl border border-slate-200 shadow-xs'>
-              <h2 class='text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2'>
-                <span class='w-2 h-2 rounded-full bg-emerald-500'></span>
+            <div class='bg-white p-6 rounded-2xl border border-zinc-200 shadow-xs'>
+              <h2 class='text-sm font-bold text-zinc-900 uppercase tracking-wider mb-4 flex items-center gap-2'>
+                <span class='w-2 h-2 rounded-full bg-black'></span>
                 Record Attendance
               </h2>
               <form method='post' class='space-y-4'>
                 {self._csrf(session)}
                 <input type='hidden' name='action' value='mark'>
                 <div>
-                  <label class='block text-xs font-semibold text-slate-700 mb-1'>Employee</label>
+                  <label class='block text-xs font-semibold text-zinc-700 mb-1'>Employee</label>
                   {select}
                 </div>
                 <div>
-                  <label class='block text-xs font-semibold text-slate-700 mb-1'>Date</label>
-                  <input name='attendance_date' type='date' value='{date.today().isoformat()}' required class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none'>
+                  <label class='block text-xs font-semibold text-zinc-700 mb-1'>Date</label>
+                  <input name='attendance_date' type='date' value='{date.today().isoformat()}' required class='w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 focus:ring-2 focus:ring-black focus:outline-none'>
                 </div>
                 <div>
-                  <label class='block text-xs font-semibold text-slate-700 mb-1'>Status</label>
-                  <select name='status' class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-slate-900 focus:outline-none'>
+                  <label class='block text-xs font-semibold text-zinc-700 mb-1'>Status</label>
+                  <select name='status' class='w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 bg-white focus:ring-2 focus:ring-black focus:outline-none'>
                     <option value='Present'>Present</option>
                     <option value='Absent'>Absent</option>
                   </select>
                 </div>
-                <button class='w-full bg-slate-900 hover:bg-slate-800 text-white font-medium py-2.5 px-4 rounded-lg text-sm transition shadow-xs'>Mark Attendance</button>
+                <button class='w-full bg-black hover:bg-zinc-800 text-white font-medium py-2.5 px-4 rounded-lg text-sm transition shadow-xs'>Mark Attendance</button>
               </form>
             </div>
             """
@@ -782,9 +816,9 @@ class EmployeeWebApp:
         leave_form = ""
         if self.auth.has_permission(session.auth_token or "", Permission.APPLY_LEAVE):
             leave_form = f"""
-            <div class='bg-white p-6 rounded-2xl border border-slate-200 shadow-xs'>
-              <h2 class='text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2'>
-                <span class='w-2 h-2 rounded-full bg-indigo-500'></span>
+            <div class='bg-white p-6 rounded-2xl border border-zinc-200 shadow-xs'>
+              <h2 class='text-sm font-bold text-zinc-900 uppercase tracking-wider mb-4 flex items-center gap-2'>
+                <span class='w-2 h-2 rounded-full bg-black'></span>
                 Apply for Leave
               </h2>
               <form method='post' class='space-y-4'>
@@ -792,19 +826,19 @@ class EmployeeWebApp:
                 <input type='hidden' name='action' value='leave'>
                 <div class='grid grid-cols-2 gap-3'>
                   <div>
-                    <label class='block text-xs font-semibold text-slate-700 mb-1'>Start Date</label>
-                    <input name='start_date' type='date' value='{date.today().isoformat()}' required class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none'>
+                    <label class='block text-xs font-semibold text-zinc-700 mb-1'>Start Date</label>
+                    <input name='start_date' type='date' value='{date.today().isoformat()}' required class='w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 focus:ring-2 focus:ring-black focus:outline-none'>
                   </div>
                   <div>
-                    <label class='block text-xs font-semibold text-slate-700 mb-1'>End Date</label>
-                    <input name='end_date' type='date' value='{date.today().isoformat()}' required class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none'>
+                    <label class='block text-xs font-semibold text-zinc-700 mb-1'>End Date</label>
+                    <input name='end_date' type='date' value='{date.today().isoformat()}' required class='w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 focus:ring-2 focus:ring-black focus:outline-none'>
                   </div>
                 </div>
                 <div>
-                  <label class='block text-xs font-semibold text-slate-700 mb-1'>Reason for Leave</label>
-                  <input name='reason' maxlength='300' required placeholder='e.g. Medical appointment, family event' class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none'>
+                  <label class='block text-xs font-semibold text-zinc-700 mb-1'>Reason for Leave</label>
+                  <input name='reason' maxlength='300' required placeholder='e.g. Medical appointment, family event' class='w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 focus:ring-2 focus:ring-black focus:outline-none'>
                 </div>
-                <button class='w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-4 rounded-lg text-sm transition shadow-xs'>Submit Leave Request</button>
+                <button class='w-full bg-black hover:bg-zinc-800 text-white font-medium py-2.5 px-4 rounded-lg text-sm transition shadow-xs'>Submit Leave Request</button>
               </form>
             </div>
             """
@@ -816,11 +850,11 @@ class EmployeeWebApp:
             {leave_form}
           </div>
           <div class='space-y-3'>
-            <h2 class='text-sm font-bold text-slate-900 uppercase tracking-wider'>Attendance History</h2>
+            <h2 class='text-sm font-bold text-zinc-900 uppercase tracking-wider'>Attendance History</h2>
             {self._table(['Employee ID', 'Employee Name', 'Date', 'Status'], attendance_rows)}
           </div>
           <div class='space-y-3'>
-            <h2 class='text-sm font-bold text-slate-900 uppercase tracking-wider'>Leave Applications & Approvals</h2>
+            <h2 class='text-sm font-bold text-zinc-900 uppercase tracking-wider'>Leave Applications & Approvals</h2>
             {self._table(['Request ID', 'Employee', 'Start Date', 'End Date', 'Reason', 'Status', 'Actions'], leave_rows)}
           </div>
         </div>
@@ -885,35 +919,35 @@ class EmployeeWebApp:
         processor = ""
         if can_process:
             processor = f"""
-            <div class='bg-white p-6 rounded-2xl border border-slate-200 shadow-xs mb-8'>
-              <h2 class='text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2'>
-                <span class='w-2 h-2 rounded-full bg-emerald-500'></span>
+            <div class='bg-white p-6 rounded-2xl border border-zinc-200 shadow-xs mb-8'>
+              <h2 class='text-sm font-bold text-zinc-900 uppercase tracking-wider mb-4 flex items-center gap-2'>
+                <span class='w-2 h-2 rounded-full bg-black'></span>
                 Generate &amp; Record Payslip
               </h2>
               <form method='post' class='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'>
                 {self._csrf(session)}
                 <div>
-                  <label class='block text-xs font-semibold text-slate-700 mb-1'>Select Employee</label>
-                  <select name='employee_id' class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-slate-900 focus:outline-none'>{self._employee_options()}</select>
+                  <label class='block text-xs font-semibold text-zinc-700 mb-1'>Select Employee</label>
+                  <select name='employee_id' class='w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 bg-white focus:ring-2 focus:ring-black focus:outline-none'>{self._employee_options()}</select>
                 </div>
                 <div>
-                  <label class='block text-xs font-semibold text-slate-700 mb-1'>Pay Period (YYYY-MM)</label>
-                  <input name='pay_period' value='{date.today().strftime('%Y-%m')}' pattern='[0-9]{{4}}-[0-9]{{2}}' required class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none'>
+                  <label class='block text-xs font-semibold text-zinc-700 mb-1'>Pay Period (YYYY-MM)</label>
+                  <input name='pay_period' value='{date.today().strftime('%Y-%m')}' pattern='[0-9]{{4}}-[0-9]{{2}}' required class='w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 focus:ring-2 focus:ring-black focus:outline-none'>
                 </div>
                 <div>
-                  <label class='block text-xs font-semibold text-slate-700 mb-1'>Basic Salary (₹)</label>
-                  <input name='basic_salary' type='number' min='0' step='.01' required placeholder='65000' class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none'>
+                  <label class='block text-xs font-semibold text-zinc-700 mb-1'>Basic Salary (₹)</label>
+                  <input name='basic_salary' type='number' min='0' step='.01' required placeholder='65000' class='w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 focus:ring-2 focus:ring-black focus:outline-none'>
                 </div>
                 <div>
-                  <label class='block text-xs font-semibold text-slate-700 mb-1'>Allowances (₹)</label>
-                  <input name='allowances' type='number' min='0' step='.01' value='0' class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none'>
+                  <label class='block text-xs font-semibold text-zinc-700 mb-1'>Allowances (₹)</label>
+                  <input name='allowances' type='number' min='0' step='.01' value='0' class='w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 focus:ring-2 focus:ring-black focus:outline-none'>
                 </div>
                 <div>
-                  <label class='block text-xs font-semibold text-slate-700 mb-1'>Deductions (₹)</label>
-                  <input name='deductions' type='number' min='0' step='.01' value='0' class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none'>
+                  <label class='block text-xs font-semibold text-zinc-700 mb-1'>Deductions (₹)</label>
+                  <input name='deductions' type='number' min='0' step='.01' value='0' class='w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 focus:ring-2 focus:ring-black focus:outline-none'>
                 </div>
                 <div class='sm:col-span-2 lg:col-span-1 flex items-end'>
-                  <button class='w-full bg-slate-900 hover:bg-slate-800 text-white font-medium py-2.5 px-4 rounded-lg text-sm transition shadow-xs'>Compute &amp; Save</button>
+                  <button class='w-full bg-black hover:bg-zinc-800 text-white font-medium py-2.5 px-4 rounded-lg text-sm transition shadow-xs'>Compute &amp; Save</button>
                 </div>
               </form>
             </div>
@@ -922,15 +956,15 @@ class EmployeeWebApp:
         own = ""
         if can_view:
             own = f"""
-            <div class='bg-white p-6 rounded-2xl border border-slate-200 shadow-xs mb-8'>
-              <h2 class='text-sm font-bold text-slate-900 uppercase tracking-wider mb-3'>View My Digital Payslip</h2>
+            <div class='bg-white p-6 rounded-2xl border border-zinc-200 shadow-xs mb-8'>
+              <h2 class='text-sm font-bold text-zinc-900 uppercase tracking-wider mb-3'>View My Digital Payslip</h2>
               <form method='get' class='flex flex-col sm:flex-row items-stretch sm:items-center gap-3'>
                 <input type='hidden' name='employee_id' value='{self._e(current.employee_id or '')}'>
                 <div class='flex items-center gap-2'>
-                  <label class='text-xs font-semibold text-slate-700'>Pay Period:</label>
-                  <input name='period' value='{date.today().strftime('%Y-%m')}' pattern='[0-9]{{4}}-[0-9]{{2}}' class='px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none'>
+                  <label class='text-xs font-semibold text-zinc-700'>Pay Period:</label>
+                  <input name='period' value='{date.today().strftime('%Y-%m')}' pattern='[0-9]{{4}}-[0-9]{{2}}' class='px-3 py-2 text-sm rounded-lg border border-zinc-300 focus:ring-2 focus:ring-black focus:outline-none'>
                 </div>
-                <button class='bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition'>Fetch Statement</button>
+                <button class='bg-black hover:bg-zinc-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition'>Fetch Statement</button>
               </form>
             </div>
             """
@@ -948,24 +982,24 @@ class EmployeeWebApp:
             ("Deductions", f"₹ {payslip.deductions:,.2f}"),
         ]
         items_html = "".join(
-            f"<div class='flex justify-between py-2 border-b border-slate-100 text-sm'><span class='text-slate-500'>{self._e(k)}</span><span class='font-medium text-slate-800'>{self._e(v)}</span></div>"
+            f"<div class='flex justify-between py-2 border-b border-zinc-100 text-sm'><span class='text-zinc-500'>{self._e(k)}</span><span class='font-medium text-zinc-800'>{self._e(v)}</span></div>"
             for k, v in values
         )
         return f"""
-        <div class='bg-white rounded-2xl border border-slate-200 shadow-xs p-6 max-w-lg mb-6'>
-          <div class='flex items-center justify-between pb-4 border-b border-slate-200'>
+        <div class='bg-white rounded-2xl border border-zinc-200 shadow-xs p-6 max-w-lg mb-6'>
+          <div class='flex items-center justify-between pb-4 border-b border-zinc-200'>
             <div>
-              <span class='text-xs font-semibold text-indigo-600 uppercase tracking-wider'>Official Pay Statement</span>
-              <h3 class='text-lg font-bold text-slate-900'>Employee Payslip</h3>
+              <span class='text-xs font-semibold text-zinc-400 uppercase tracking-wider'>Official Pay Statement</span>
+              <h3 class='text-lg font-bold text-zinc-900'>Employee Payslip</h3>
             </div>
-            <span class='px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200'>{self._e(payslip.pay_period)}</span>
+            <span class='px-2.5 py-1 rounded-full text-xs font-semibold bg-zinc-100 text-zinc-800 border border-zinc-200'>{self._e(payslip.pay_period)}</span>
           </div>
-          <div class='mt-4 divide-y divide-slate-100'>
+          <div class='mt-4 divide-y divide-zinc-100'>
             {items_html}
           </div>
-          <div class='mt-4 pt-3 border-t border-slate-200 flex justify-between items-center'>
-            <span class='text-base font-bold text-slate-900'>Net Payable Salary</span>
-            <span class='text-xl font-black text-emerald-600'>₹ {payslip.net_salary:,.2f}</span>
+          <div class='mt-4 pt-3 border-t border-zinc-200 flex justify-between items-center'>
+            <span class='text-base font-bold text-zinc-900'>Net Payable Salary</span>
+            <span class='text-xl font-black text-black'>₹ {payslip.net_salary:,.2f}</span>
           </div>
         </div>
         """
@@ -973,7 +1007,7 @@ class EmployeeWebApp:
     def _payslip_download_link(self, payslip) -> str:
         return f"""
         <div class='mb-8'>
-          <a class='inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition shadow-xs' href='/download?type=payslip&amp;employee_id={self._e(payslip.employee_id)}&amp;period={self._e(payslip.pay_period)}'>
+          <a class='inline-flex items-center gap-2 bg-black hover:bg-zinc-800 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition shadow-xs' href='/download?type=payslip&amp;employee_id={self._e(payslip.employee_id)}&amp;period={self._e(payslip.pay_period)}'>
             <svg class='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4'/></svg>
             Download Payslip Document (.txt)
           </a>
@@ -1002,26 +1036,26 @@ class EmployeeWebApp:
         controls = f"""
         <div class='flex flex-wrap items-center justify-between gap-3 mb-6'>
           <div class='flex flex-wrap gap-2'>
-            <a href='/reports?type=headcount' class='px-3.5 py-1.5 rounded-lg text-xs font-semibold transition {'bg-slate-900 text-white shadow-xs' if report_type == 'headcount' else 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'}'>👥 Headcount & Demographics</a>
-            <a href='/reports?type=attendance' class='px-3.5 py-1.5 rounded-lg text-xs font-semibold transition {'bg-slate-900 text-white shadow-xs' if report_type == 'attendance' else 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'}'>🗓️ Attendance Analytics</a>
-            <a href='/reports?type=salary' class='px-3.5 py-1.5 rounded-lg text-xs font-semibold transition {'bg-slate-900 text-white shadow-xs' if report_type == 'salary' else 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'}'>💵 Financial Salary Analytics</a>
+            <a href='/reports?type=headcount' class='px-3.5 py-1.5 rounded-lg text-xs font-semibold transition {'bg-black text-white shadow-xs' if report_type == 'headcount' else 'bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-50'}'>👥 Headcount & Demographics</a>
+            <a href='/reports?type=attendance' class='px-3.5 py-1.5 rounded-lg text-xs font-semibold transition {'bg-black text-white shadow-xs' if report_type == 'attendance' else 'bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-50'}'>🗓️ Attendance Analytics</a>
+            <a href='/reports?type=salary' class='px-3.5 py-1.5 rounded-lg text-xs font-semibold transition {'bg-black text-white shadow-xs' if report_type == 'salary' else 'bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-50'}'>💵 Financial Salary Analytics</a>
           </div>
-          <a href='/download?type=report&amp;report={self._e(report_type)}' class='inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold px-3.5 py-1.5 rounded-lg transition shadow-xs'>
-            <svg class='w-3.5 h-3.5 text-slate-500' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4'/></svg>
+          <a href='/download?type=report&amp;report={self._e(report_type)}' class='inline-flex items-center gap-1.5 bg-white hover:bg-zinc-50 border border-zinc-300 text-zinc-700 text-xs font-semibold px-3.5 py-1.5 rounded-lg transition shadow-xs'>
+            <svg class='w-3.5 h-3.5 text-zinc-500' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4'/></svg>
             Download Report (.txt)
           </a>
         </div>
         """
         viewer = f"""
-        <div class='bg-slate-900 rounded-2xl border border-slate-800 p-6 shadow-lg'>
-          <div class='flex items-center justify-between pb-3 mb-4 border-b border-slate-800 text-xs text-slate-400'>
-            <span class='font-semibold text-slate-200 flex items-center gap-2'>
-              <span class='w-2 h-2 rounded-full bg-emerald-400'></span>
+        <div class='bg-black rounded-2xl border border-zinc-800 p-6 shadow-lg'>
+          <div class='flex items-center justify-between pb-3 mb-4 border-b border-zinc-800 text-xs text-zinc-400'>
+            <span class='font-semibold text-zinc-200 flex items-center gap-2'>
+              <span class='w-2 h-2 rounded-full bg-zinc-400'></span>
               {self._e(title)}
             </span>
             <span>Generated live from SQLite database</span>
           </div>
-          <pre class='text-sky-300 font-mono text-xs md:text-sm leading-relaxed overflow-x-auto'>{self._e(text)}</pre>
+          <pre class='text-zinc-100 font-mono text-xs md:text-sm leading-relaxed overflow-x-auto'>{self._e(text)}</pre>
         </div>
         """
         return self._page("Reports", f"{controls}{viewer}", current, session)
@@ -1091,50 +1125,50 @@ class EmployeeWebApp:
         rows = []
         for user in self.auth.list_all_users():
             status_badge = (
-                "<span class='inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200'>Active</span>"
+                "<span class='inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200'>Active</span>"
                 if user.is_active
-                else "<span class='inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200'>Disabled</span>"
+                else "<span class='inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-zinc-100 text-zinc-500 border border-zinc-200'>Disabled</span>"
             )
             role_badge = (
-                "<span class='inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200'>Admin</span>"
+                "<span class='inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-zinc-900 text-white border border-zinc-700'>Admin</span>"
                 if user.role == "Admin"
-                else "<span class='inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200'>Employee</span>"
+                else "<span class='inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-zinc-100 text-zinc-800 border border-zinc-300'>Employee</span>"
             )
             rows.append([
-                f"<span class='font-medium text-slate-900'>{user.username}</span>",
+                f"<span class='font-medium text-zinc-900'>{user.username}</span>",
                 role_badge,
-                f"<span class='font-mono text-xs text-slate-700'>{user.employee_id or '—'}</span>",
+                f"<span class='font-mono text-xs text-zinc-700'>{user.employee_id or '—'}</span>",
                 status_badge,
             ])
 
         form = f"""
-        <div class='bg-white p-6 rounded-2xl border border-slate-200 shadow-xs mb-8'>
-          <h2 class='text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2'>
-            <span class='w-2 h-2 rounded-full bg-indigo-500'></span>
+        <div class='bg-white p-6 rounded-2xl border border-zinc-200 shadow-xs mb-8'>
+          <h2 class='text-sm font-bold text-zinc-900 uppercase tracking-wider mb-4 flex items-center gap-2'>
+            <span class='w-2 h-2 rounded-full bg-black'></span>
             Create Employee Account
           </h2>
           <form method='post' class='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'>
             {self._csrf(session)}
             <div>
-              <label class='block text-xs font-semibold text-slate-700 mb-1'>Link to Employee</label>
-              <select name='employee_id' class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-slate-900 focus:outline-none'>{self._employee_options()}</select>
+              <label class='block text-xs font-semibold text-zinc-700 mb-1'>Link to Employee</label>
+              <select name='employee_id' class='w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 bg-white focus:ring-2 focus:ring-black focus:outline-none'>{self._employee_options()}</select>
             </div>
             <div>
-              <label class='block text-xs font-semibold text-slate-700 mb-1'>Username *</label>
-              <input name='username' pattern='[A-Za-z0-9_.-]{{3,50}}' required placeholder='e.g. asharma' class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none'>
+              <label class='block text-xs font-semibold text-zinc-700 mb-1'>Username *</label>
+              <input name='username' pattern='[A-Za-z0-9_.-]{{3,50}}' required placeholder='e.g. asharma' class='w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 focus:ring-2 focus:ring-black focus:outline-none'>
             </div>
             <div>
-              <label class='block text-xs font-semibold text-slate-700 mb-1'>Temporary Password *</label>
-              <input name='password' type='password' minlength='12' required placeholder='12+ chars, mixed' class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none'>
+              <label class='block text-xs font-semibold text-zinc-700 mb-1'>Temporary Password *</label>
+              <input name='password' type='password' minlength='12' required placeholder='12+ chars, mixed' class='w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 focus:ring-2 focus:ring-black focus:outline-none'>
             </div>
             <div class='sm:col-span-2 lg:col-span-3 flex items-center justify-between pt-2'>
-              <p class='text-xs text-slate-500'>Password policy: 12+ characters and at least three of: lowercase, uppercase, number, symbol.</p>
-              <button class='bg-slate-900 hover:bg-slate-800 text-white font-medium px-5 py-2.5 rounded-lg text-sm transition shadow-xs'>Create Account</button>
+              <p class='text-xs text-zinc-500'>Password policy: 12+ characters and at least three of: lowercase, uppercase, number, symbol.</p>
+              <button class='bg-black hover:bg-zinc-800 text-white font-medium px-5 py-2.5 rounded-lg text-sm transition shadow-xs'>Create Account</button>
             </div>
           </form>
         </div>
         """
-        content = f"{form}<div class='space-y-3'><h2 class='text-sm font-bold text-slate-900 uppercase tracking-wider'>User Accounts</h2>{self._table(['Username', 'Role', 'Linked Employee', 'Status'], rows)}</div>"
+        content = f"{form}<div class='space-y-3'><h2 class='text-sm font-bold text-zinc-900 uppercase tracking-wider'>User Accounts</h2>{self._table(['Username', 'Role', 'Linked Employee', 'Status'], rows)}</div>"
         return self._page("User accounts", content, current, session)
 
     # --------------------------- Service setup ------------------------------
@@ -1168,21 +1202,17 @@ html {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #d4d4d8;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #a1a1aa;
 }
 details > summary::-webkit-details-marker {
   display: none;
 }
 details > summary::after {
-  content: "▾";
-  margin-left: 4px;
-}
-details[open] > summary::after {
-  content: "▴";
+  content: "";
 }
 pre {
   tab-size: 2;
