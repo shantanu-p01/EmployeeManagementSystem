@@ -3,6 +3,7 @@
 Run with ``python3 main.py`` and visit http://127.0.0.1:8000.  This module
 uses only the Python standard library; the existing domain services continue
 to own employee, attendance, payroll, reporting, and authentication logic.
+Styled with modern, responsive Tailwind CSS via CDN.
 """
 
 from __future__ import annotations
@@ -52,7 +53,17 @@ class EmployeeWebApp:
             response = self._dispatch(request, browser_session, current)
         except Exception:
             # Do not leak implementation details in browser responses.
-            response = self._page("Unexpected error", "<p>We could not complete that request. Please try again.</p>", current, browser_session, status="500 Internal Server Error")
+            response = self._page(
+                "Unexpected error",
+                "<div class='bg-white rounded-2xl border border-slate-200 p-8 text-center max-w-md mx-auto shadow-xs'>"
+                "<h3 class='text-base font-bold text-slate-900'>Something went wrong</h3>"
+                "<p class='text-slate-600 text-sm mt-1.5'>We could not complete that request. Please try again.</p>"
+                "<a href='/' class='inline-block mt-4 bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium px-4 py-2 rounded-lg transition'>Return to Home</a>"
+                "</div>",
+                current,
+                browser_session,
+                status="500 Internal Server Error",
+            )
 
         status, headers, body = response
         if not any(header.lower() == "content-type" for header, _ in headers):
@@ -61,7 +72,15 @@ class EmployeeWebApp:
             ("X-Content-Type-Options", "nosniff"),
             ("X-Frame-Options", "DENY"),
             ("Referrer-Policy", "same-origin"),
-            ("Content-Security-Policy", "default-src 'self'; style-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"),
+            (
+                "Content-Security-Policy",
+                "default-src 'self'; "
+                "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; "
+                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com; "
+                "font-src 'self' https://fonts.gstatic.com data:; "
+                "img-src 'self' data:; "
+                "base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+            ),
             ("Cache-Control", "no-store"),
         ])
         if new_session:
@@ -135,17 +154,131 @@ class EmployeeWebApp:
     def _page(self, title: str, content: str, current, session: BrowserSession, status: str = "200 OK"):
         nav = ""
         if current:
-            nav = """<nav><a href='/'>Overview</a><a href='/employees'>Employees</a><a href='/attendance'>Attendance &amp; leave</a><a href='/payroll'>Payroll</a>"""
+            def nav_link(href: str, label: str, active: bool) -> str:
+                if active:
+                    return f"<a href='{href}' class='bg-slate-800 text-white px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium transition shadow-xs'>{label}</a>"
+                return f"<a href='{href}' class='text-slate-300 hover:text-white hover:bg-slate-800/60 px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium transition'>{label}</a>"
+
+            links = [
+                nav_link("/employees", "Employees", title == "Employees"),
+                nav_link("/attendance", "Attendance & Leave", title == "Attendance & leave"),
+                nav_link("/payroll", "Payroll", title == "Payroll & payslips"),
+            ]
             if self.auth.has_permission(session.auth_token or "", Permission.VIEW_REPORTS):
-                nav += "<a href='/reports'>Reports</a>"
+                links.append(nav_link("/reports", "Reports", title == "Reports"))
             if self.auth.has_permission(session.auth_token or "", Permission.ADD_EMPLOYEE):
-                nav += "<a href='/users'>User accounts</a>"
-            nav += "</nav>"
-            user = f"<span class='user'>{self._e(current.username)} · {self._e(current.role)}</span><form class='inline' method='post' action='/logout'>{self._csrf(session)}<button class='quiet'>Sign out</button></form>"
+                links.append(nav_link("/users", "User Accounts", title == "User accounts"))
+
+            nav = f"<nav class='hidden md:flex items-center gap-1.5 flex-1'>{''.join(links)}</nav>"
+            role_badge = (
+                "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                if current.role == "Admin"
+                else "bg-sky-500/10 text-sky-400 border-sky-500/30"
+            )
+            user = f"""
+            <div class='flex items-center gap-3'>
+              <div class='flex items-center gap-2'>
+                <span class='w-7 h-7 rounded-full bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold flex items-center justify-center'>{self._e(current.username[:1].upper())}</span>
+                <span class='text-xs md:text-sm font-medium text-slate-200 hidden sm:inline'>{self._e(current.username)}</span>
+                <span class='text-[10px] md:text-xs font-semibold px-2 py-0.5 rounded-full border {role_badge}'>{self._e(current.role)}</span>
+              </div>
+              <form class='inline' method='post' action='/logout'>
+                {self._csrf(session)}
+                <button class='text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-lg transition'>Sign out</button>
+              </form>
+            </div>
+            """
         else:
-            user = "<a class='button quiet' href='/login'>Sign in</a>"
-        notices = "".join(f"<div class='notice {self._e(item['kind'])}'>{self._e(item['message'])}</div>" for item in database.flash_pop(session.session_id))
-        page = f"""<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'><title>{self._e(title)} · {APP_NAME}</title><link rel='stylesheet' href='/assets/app.css'></head><body><header><a class='brand' href='/'>{APP_NAME}</a>{nav}<div class='account'>{user}</div></header><main><div class='title'><h1>{self._e(title)}</h1></div>{notices}{content}</main></body></html>"""
+            user = "<a class='text-xs md:text-sm font-medium text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3.5 py-1.5 rounded-lg transition' href='/login'>Sign in</a>"
+
+        # Notices / Flash alerts
+        notices_list = []
+        for item in database.flash_pop(session.session_id):
+            is_success = item["kind"] == "success"
+            bg_color = "bg-emerald-50 border-emerald-200 text-emerald-900" if is_success else "bg-rose-50 border-rose-200 text-rose-900"
+            icon = (
+                """<svg class='w-5 h-5 flex-shrink-0 text-emerald-600' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5 13l4 4L19 7'/></svg>"""
+                if is_success
+                else """<svg class='w-5 h-5 flex-shrink-0 text-rose-600' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z'/></svg>"""
+            )
+            notices_list.append(
+                f"<div class='mb-6 p-4 rounded-xl border flex items-center gap-3 text-sm font-medium shadow-xs {bg_color}'>"
+                f"{icon}<span>{self._e(item['message'])}</span></div>"
+            )
+        notices = "".join(notices_list)
+
+        # Mobile navigation links for small viewports
+        mobile_nav = ""
+        if current:
+            mobile_links = [
+                f"<a href='/employees' class='text-xs font-medium text-slate-300 hover:text-white px-2 py-1'>Employees</a>",
+                f"<a href='/attendance' class='text-xs font-medium text-slate-300 hover:text-white px-2 py-1'>Attendance</a>",
+                f"<a href='/payroll' class='text-xs font-medium text-slate-300 hover:text-white px-2 py-1'>Payroll</a>",
+            ]
+            if self.auth.has_permission(session.auth_token or "", Permission.VIEW_REPORTS):
+                mobile_links.append("<a href='/reports' class='text-xs font-medium text-slate-300 hover:text-white px-2 py-1'>Reports</a>")
+            if self.auth.has_permission(session.auth_token or "", Permission.ADD_EMPLOYEE):
+                mobile_links.append("<a href='/users' class='text-xs font-medium text-slate-300 hover:text-white px-2 py-1'>Users</a>")
+            mobile_nav = f"<div class='flex md:hidden items-center gap-2 overflow-x-auto py-2 border-t border-slate-800 mt-2.5 w-full'>{''.join(mobile_links)}</div>"
+
+        page = f"""<!doctype html>
+<html lang='en' class='h-full bg-slate-50'>
+<head>
+  <meta charset='utf-8'>
+  <meta name='viewport' content='width=device-width, initial-scale=1'>
+  <title>{self._e(title)} · {APP_NAME}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {{
+      theme: {{
+        extend: {{
+          fontFamily: {{
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          }},
+        }}
+      }}
+    }}
+  </script>
+  <link rel='stylesheet' href='/assets/app.css'>
+</head>
+<body class='min-h-full flex flex-col font-sans text-slate-900 antialiased bg-slate-50'>
+  <header class='sticky top-0 z-40 bg-slate-900 border-b border-slate-800 text-white shadow-xs'>
+    <div class='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
+      <div class='flex items-center justify-between h-16 gap-4'>
+        <div class='flex items-center gap-4 md:gap-8'>
+          <a href='/' class='flex items-center gap-2 text-base md:text-lg font-bold text-white tracking-tight hover:opacity-95 transition'>
+            <span class='w-7 h-7 md:w-8 md:h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white text-xs md:text-sm font-black shadow-inner'>EMS</span>
+            <span>{APP_NAME}</span>
+          </a>
+          {nav}
+        </div>
+        <div class='flex items-center gap-3'>
+          {user}
+        </div>
+      </div>
+      {mobile_nav}
+    </div>
+  </header>
+
+  <main class='flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8'>
+    <div class='border-b border-slate-200 pb-5 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2'>
+      <h1 class='text-2xl font-bold tracking-tight text-slate-900'>{self._e(title)}</h1>
+    </div>
+    {notices}
+    {content}
+  </main>
+
+  <footer class='border-t border-slate-200 bg-white py-6 mt-12 text-center text-xs text-slate-500'>
+    <div class='max-w-7xl mx-auto px-4'>
+      <p>{APP_NAME} &middot; Enterprise Human Resources &amp; Workforce Management Platform &middot; All records secured via server-side RBAC.</p>
+    </div>
+  </footer>
+</body>
+</html>"""
         return status, [], page
 
     def _csrf(self, session: BrowserSession) -> str:
@@ -157,9 +290,31 @@ class EmployeeWebApp:
 
     @staticmethod
     def _table(headers: List[str], rows: List[List[object]]) -> str:
-        head = "".join(f"<th>{html.escape(header)}</th>" for header in headers)
-        body = "".join("<tr>" + "".join(f"<td>{cell if isinstance(cell, str) and cell.startswith('<') else html.escape(str(cell))}</td>" for cell in row) + "</tr>" for row in rows)
-        return f"<div class='table-wrap'><table><thead><tr>{head}</tr></thead><tbody>{body or '<tr><td colspan='+str(len(headers))+'>No records found.</td></tr>'}</tbody></table></div>"
+        head = "".join(f"<th class='px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider'>{html.escape(header)}</th>" for header in headers)
+        body = "".join(
+            "<tr class='hover:bg-slate-50/70 transition-colors'>"
+            + "".join(
+                f"<td class='px-4 py-3.5 text-slate-700 whitespace-nowrap'>{cell if isinstance(cell, str) and cell.startswith('<') else html.escape(str(cell))}</td>"
+                for cell in row
+            )
+            + "</tr>"
+            for row in rows
+        )
+        empty_row = f"<tr><td colspan='{len(headers)}' class='px-6 py-10 text-center text-slate-400 italic text-sm'>No records found.</td></tr>"
+        return f"""
+        <div class='overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs'>
+          <div class='overflow-x-auto'>
+            <table class='min-w-full divide-y divide-slate-200 text-sm'>
+              <thead class='bg-slate-50/80'>
+                <tr>{head}</tr>
+              </thead>
+              <tbody class='divide-y divide-slate-100 bg-white'>
+                {body or empty_row}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        """
 
     # ------------------------------ Routing ---------------------------------
     def _dispatch(self, request: dict, session: BrowserSession, current):
@@ -191,7 +346,17 @@ class EmployeeWebApp:
             return self._download(request, session, current)
         if path == "/users":
             return self._users(request, session, current)
-        return self._page("Page not found", "<p>The requested page does not exist.</p>", current, session, status="404 Not Found")
+        return self._page(
+            "Page not found",
+            "<div class='bg-white rounded-2xl border border-slate-200 p-8 text-center max-w-md mx-auto shadow-xs'>"
+            "<h3 class='text-lg font-bold text-slate-900'>404 &middot; Not Found</h3>"
+            "<p class='text-slate-600 text-sm mt-1.5'>The requested page does not exist.</p>"
+            "<a href='/' class='inline-block mt-4 bg-slate-900 text-white text-xs font-medium px-4 py-2 rounded-lg'>Go Home</a>"
+            "</div>",
+            current,
+            session,
+            status="404 Not Found",
+        )
 
     def _login(self, request: dict, session: BrowserSession, current):
         if current:
@@ -208,15 +373,98 @@ class EmployeeWebApp:
                 # A single response protects usernames, account state, and lock status.
                 self._flash(session, "error", "Unable to sign in with those credentials.")
                 return self._redirect("/login", session)
-        content = f"""<section class='auth-card'><p class='lead'>Secure access to employee, attendance, and payroll operations.</p><form method='post' class='stack'>{self._csrf(session)}<label>Username<input name='username' autocomplete='username' required maxlength='50'></label><label>Password<input name='password' type='password' autocomplete='current-password' required></label><button>Sign in</button></form><p class='hint'>After five failed attempts, sign-in is temporarily locked for 15 minutes. Sessions expire after 30 minutes.</p></section>"""
+        content = f"""
+        <div class='min-h-[calc(100vh-220px)] flex items-center justify-center py-6'>
+          <div class='w-full max-w-md bg-white rounded-2xl border border-slate-200 p-8 shadow-sm'>
+            <div class='text-center mb-6'>
+              <div class='inline-flex items-center justify-center w-12 h-12 rounded-xl bg-slate-900 text-white font-black text-lg mb-3 shadow-sm'>EMS</div>
+              <h2 class='text-xl font-bold text-slate-900 tracking-tight'>Sign in to your workspace</h2>
+              <p class='text-xs text-slate-500 mt-1'>Secure access to employee, attendance, and payroll operations.</p>
+            </div>
+            <form method='post' class='space-y-4'>
+              {self._csrf(session)}
+              <div>
+                <label class='block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5'>Username</label>
+                <input name='username' autocomplete='username' required maxlength='50' class='w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-slate-900 focus:border-slate-900 focus:outline-none transition text-sm' placeholder='e.g. admin'>
+              </div>
+              <div>
+                <label class='block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5'>Password</label>
+                <input name='password' type='password' autocomplete='current-password' required class='w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-slate-900 focus:border-slate-900 focus:outline-none transition text-sm' placeholder='••••••••'>
+              </div>
+              <button class='w-full bg-slate-900 hover:bg-slate-800 text-white font-medium py-2.5 px-4 rounded-lg shadow-sm transition text-sm'>Sign in</button>
+            </form>
+            <div class='mt-6 pt-5 border-t border-slate-100 flex items-start gap-2.5 text-xs text-slate-500 bg-slate-50 p-3.5 rounded-xl border border-slate-200/60'>
+              <svg class='w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z'/></svg>
+              <div>
+                <p class='font-semibold text-slate-700'>Default Seed Credentials</p>
+                <p class='mt-0.5'>Administrator: <code class='font-mono font-bold text-slate-800'>admin</code> / <code class='font-mono font-bold text-slate-800'>admin</code></p>
+                <p class='mt-0.5 text-slate-400'>5 failed attempts locks sign-in for 15 minutes. Sessions expire after 30 minutes.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        """
         return self._page("Sign in", content, None, session)
 
     def _dashboard(self, current, session: BrowserSession):
         records = employees.get_all_employees()
-        counts = [("Employees", len(records)), ("Attendance entries", len(self.attendance.get_all_attendance())), ("Leave requests", len(self.leaves.get_leave_requests()))]
-        cards = "".join(f"<div class='card'><span>{label}</span><strong>{count}</strong></div>" for label, count in counts)
-        allowed = ", ".join(current.permissions) or "No permissions"
-        content = f"<p class='lead'>Welcome back, {self._e(current.username)}. Your session is protected server-side and your role controls every action.</p><section class='cards'>{cards}</section><section class='panel'><h2>Your access</h2><p><b>{self._e(current.role)}</b> role</p><p class='permissions'>{self._e(allowed)}</p></section>"
+        counts = [
+            ("Total Employees", len(records), "Active workforce records in directory", "bg-indigo-50 text-indigo-700 border-indigo-200"),
+            ("Attendance Entries", len(self.attendance.get_all_attendance()), "Recorded daily presence / absence logs", "bg-emerald-50 text-emerald-700 border-emerald-200"),
+            ("Leave Requests", len(self.leaves.get_leave_requests()), "Pending, approved, & historic requests", "bg-amber-50 text-amber-700 border-amber-200"),
+        ]
+        cards = "".join(
+            f"""
+            <div class='bg-white p-6 rounded-2xl border border-slate-200 shadow-xs hover:border-slate-300 transition'>
+              <div class='flex items-center justify-between'>
+                <span class='text-xs font-semibold uppercase tracking-wider text-slate-500'>{label}</span>
+                <span class='text-[10px] font-semibold px-2 py-0.5 rounded-full border {badge_style}'>Live Database</span>
+              </div>
+              <div class='text-3xl font-extrabold text-slate-900 tracking-tight mt-3'>{count}</div>
+              <p class='text-xs text-slate-500 mt-1.5'>{sub}</p>
+            </div>
+            """
+            for label, count, sub, badge_style in counts
+        )
+
+        perm_tags = "".join(
+            f"<span class='inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-slate-50 text-slate-700 border border-slate-200'><svg class='w-3.5 h-3.5 text-emerald-600' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5 13l4 4L19 7'/></svg>{self._e(p)}</span>"
+            for p in current.permissions
+        ) or "<span class='text-xs text-slate-400 italic'>No specific permissions assigned.</span>"
+
+        role_badge = "bg-rose-50 text-rose-700 border-rose-200" if current.role == "Admin" else "bg-sky-50 text-sky-700 border-sky-200"
+
+        content = f"""
+        <div class='space-y-8'>
+          <div class='bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4'>
+            <div>
+              <h2 class='text-lg font-bold text-slate-900 tracking-tight'>Welcome back, {self._e(current.username)}!</h2>
+              <p class='text-xs text-slate-500 mt-1'>Logged in as <span class='font-semibold text-slate-700'>{self._e(current.role)}</span>. Your session is protected by cryptographic cookies and strict CSRF tokens.</p>
+            </div>
+            <div class='flex items-center gap-2'>
+              <a href='/employees' class='bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium px-4 py-2 rounded-lg transition shadow-xs'>Employee Directory</a>
+              <a href='/attendance' class='bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-medium px-4 py-2 rounded-lg transition shadow-xs'>Attendance & Leave</a>
+            </div>
+          </div>
+
+          <div class='grid grid-cols-1 md:grid-cols-3 gap-5'>
+            {cards}
+          </div>
+
+          <div class='bg-white p-6 rounded-2xl border border-slate-200 shadow-xs'>
+            <div class='flex items-center justify-between pb-4 border-b border-slate-100'>
+              <div>
+                <h3 class='text-sm font-bold text-slate-900 uppercase tracking-wider'>Your Access & Permissions</h3>
+                <p class='text-xs text-slate-500 mt-0.5'>Active role security profile evaluated by server-side authorizer.</p>
+              </div>
+              <span class='px-3 py-1 rounded-full text-xs font-semibold border {role_badge}'>{self._e(current.role)} Role</span>
+            </div>
+            <div class='mt-4 flex flex-wrap gap-2'>
+              {perm_tags}
+            </div>
+          </div>
+        </div>
+        """
         return self._page("Overview", content, current, session)
 
     # --------------------------- Employee records ---------------------------
@@ -237,12 +485,26 @@ class EmployeeWebApp:
                     name = self._value(request, "name")
                     if not name:
                         raise ValueError("Employee name is required.")
-                    record = employees.add_employee(name, self._value(request, "email"), self._value(request, "phone"), self._value(request, "department"), self._value(request, "designation"), emp_id or None)
-                    return self._redirect("/employees", session, f"Employee {record['id']} was added.")
+                    record = employees.add_employee(
+                        name,
+                        self._value(request, "email"),
+                        self._value(request, "phone"),
+                        self._value(request, "department"),
+                        self._value(request, "designation"),
+                        emp_id or None,
+                    )
+                    return self._redirect("/employees", session, f"Employee {record['id']} was added successfully.")
                 if action == "update":
                     if (blocked := self._require(session, current, Permission.UPDATE_EMPLOYEE)):
                         return blocked
-                    if not employees.update_employee(emp_id, self._value(request, "name"), self._value(request, "email"), self._value(request, "phone"), self._value(request, "department"), self._value(request, "designation")):
+                    if not employees.update_employee(
+                        emp_id,
+                        self._value(request, "name"),
+                        self._value(request, "email"),
+                        self._value(request, "phone"),
+                        self._value(request, "department"),
+                        self._value(request, "designation"),
+                    ):
                         raise ValueError("Employee was not found.")
                     return self._redirect("/employees", session, "Employee details were updated.")
                 if action == "delete":
@@ -250,7 +512,7 @@ class EmployeeWebApp:
                         return blocked
                     if not employees.delete_employee(emp_id):
                         raise ValueError("Employee was not found.")
-                    return self._redirect("/employees", session, "Employee was removed.")
+                    return self._redirect("/employees", session, "Employee record was removed.")
                 raise ValueError("Unsupported employee action.")
             except ValueError as exc:
                 return self._redirect("/employees", session, str(exc), "error")
@@ -259,21 +521,123 @@ class EmployeeWebApp:
         is_admin = self.auth.has_permission(session.auth_token or "", Permission.ADD_EMPLOYEE)
         if not is_admin:
             data = [item for item in data if item["id"] == current.employee_id]
+
         rows = []
         for item in data:
             action = ""
             if is_admin:
-                action = f"<details><summary>Edit</summary><form method='post' class='compact'>{self._csrf(session)}<input name='action' value='update' type='hidden'><input name='employee_id' value='{self._e(item['id'])}' type='hidden'><input name='name' value='{self._e(item['name'])}' required><input name='email' value='{self._e(item['email'])}'><input name='phone' value='{self._e(item['phone'])}'><input name='department' value='{self._e(item['department'])}'><input name='designation' value='{self._e(item['designation'])}'><button>Save</button></form><form method='post' class='inline'>{self._csrf(session)}<input name='action' value='delete' type='hidden'><input name='employee_id' value='{self._e(item['id'])}' type='hidden'><button class='danger' onclick=\"return confirm('Remove this employee?')\">Remove</button></form></details>"
-            rows.append([item["id"], item["name"], item["email"], item["phone"], item["department"], item["designation"], action])
+                action = f"""
+                <details class='relative inline-block text-left'>
+                  <summary class='cursor-pointer inline-flex items-center gap-1 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-md transition select-none'>
+                    Edit &middot; Actions
+                  </summary>
+                  <div class='absolute right-0 top-full mt-2 w-72 bg-white rounded-xl border border-slate-200 shadow-xl p-4 z-20'>
+                    <form method='post' class='space-y-2.5'>
+                      {self._csrf(session)}
+                      <input name='action' value='update' type='hidden'>
+                      <input name='employee_id' value='{self._e(item['id'])}' type='hidden'>
+                      <div>
+                        <label class='block text-[11px] font-semibold text-slate-600 mb-0.5'>Full Name</label>
+                        <input name='name' value='{self._e(item['name'])}' required class='w-full px-2.5 py-1.5 text-xs rounded-md border border-slate-300 focus:ring-1 focus:ring-slate-900 focus:outline-none'>
+                      </div>
+                      <div>
+                        <label class='block text-[11px] font-semibold text-slate-600 mb-0.5'>Email</label>
+                        <input name='email' value='{self._e(item['email'])}' class='w-full px-2.5 py-1.5 text-xs rounded-md border border-slate-300 focus:ring-1 focus:ring-slate-900 focus:outline-none'>
+                      </div>
+                      <div>
+                        <label class='block text-[11px] font-semibold text-slate-600 mb-0.5'>Phone</label>
+                        <input name='phone' value='{self._e(item['phone'])}' class='w-full px-2.5 py-1.5 text-xs rounded-md border border-slate-300 focus:ring-1 focus:ring-slate-900 focus:outline-none'>
+                      </div>
+                      <div>
+                        <label class='block text-[11px] font-semibold text-slate-600 mb-0.5'>Department</label>
+                        <input name='department' value='{self._e(item['department'])}' class='w-full px-2.5 py-1.5 text-xs rounded-md border border-slate-300 focus:ring-1 focus:ring-slate-900 focus:outline-none'>
+                      </div>
+                      <div>
+                        <label class='block text-[11px] font-semibold text-slate-600 mb-0.5'>Designation</label>
+                        <input name='designation' value='{self._e(item['designation'])}' class='w-full px-2.5 py-1.5 text-xs rounded-md border border-slate-300 focus:ring-1 focus:ring-slate-900 focus:outline-none'>
+                      </div>
+                      <div class='flex items-center justify-between pt-2 border-t border-slate-100'>
+                        <button class='bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium px-3 py-1.5 rounded-md transition'>Save Updates</button>
+                      </div>
+                    </form>
+                    <form method='post' class='mt-2 pt-2 border-t border-slate-100 flex justify-end'>
+                      {self._csrf(session)}
+                      <input name='action' value='delete' type='hidden'>
+                      <input name='employee_id' value='{self._e(item['id'])}' type='hidden'>
+                      <button class='text-xs font-medium text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-md transition' onclick=\"return confirm('Permanently remove employee {self._e(item['id'])}?')\">Delete Record</button>
+                    </form>
+                  </div>
+                </details>
+                """
+            emp_badge = f"<span class='font-mono text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200'>{self._e(item['id'])}</span>"
+            dept_badge = f"<span class='inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100'>{self._e(item['department'])}</span>"
+            rows.append([emp_badge, item["name"], item["email"] or "—", item["phone"] or "—", dept_badge, item["designation"], action])
+
         add_form = ""
         if is_admin:
-            add_form = f"""<section class='panel'><h2>Add employee</h2><form method='post' class='grid-form'>{self._csrf(session)}<input type='hidden' name='action' value='add'><label>Employee ID <input name='employee_id' placeholder='Auto-generated if blank'></label><label>Name <input name='name' required></label><label>Email <input name='email' type='email'></label><label>Phone <input name='phone'></label><label>Department <input name='department' required></label><label>Designation <input name='designation' required></label><button>Add employee</button></form></section>"""
-        content = f"<form class='search' method='get'><input name='q' value='{self._e(keyword)}' placeholder='Search name, ID, department…'><button>Search</button></form>{add_form}<section class='panel'><h2>Employee directory</h2>{self._table(['ID', 'Name', 'Email', 'Phone', 'Department', 'Designation', 'Actions'], rows)}</section>"
+            add_form = f"""
+            <div class='bg-white p-6 rounded-2xl border border-slate-200 shadow-xs mb-8'>
+              <h2 class='text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2'>
+                <span class='w-2 h-2 rounded-full bg-emerald-500'></span>
+                Add New Employee
+              </h2>
+              <form method='post' class='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'>
+                {self._csrf(session)}
+                <input type='hidden' name='action' value='add'>
+                <div>
+                  <label class='block text-xs font-semibold text-slate-700 mb-1'>Employee ID</label>
+                  <input name='employee_id' placeholder='Auto-generated if blank' class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none'>
+                </div>
+                <div>
+                  <label class='block text-xs font-semibold text-slate-700 mb-1'>Full Name *</label>
+                  <input name='name' required class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none' placeholder='e.g. Ananya Sharma'>
+                </div>
+                <div>
+                  <label class='block text-xs font-semibold text-slate-700 mb-1'>Email Address</label>
+                  <input name='email' type='email' class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none' placeholder='name@company.com'>
+                </div>
+                <div>
+                  <label class='block text-xs font-semibold text-slate-700 mb-1'>Phone Number</label>
+                  <input name='phone' class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none' placeholder='+91 98765 43210'>
+                </div>
+                <div>
+                  <label class='block text-xs font-semibold text-slate-700 mb-1'>Department *</label>
+                  <input name='department' required class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none' placeholder='e.g. Engineering'>
+                </div>
+                <div>
+                  <label class='block text-xs font-semibold text-slate-700 mb-1'>Designation *</label>
+                  <input name='designation' required class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none' placeholder='e.g. Senior Software Engineer'>
+                </div>
+                <div class='sm:col-span-2 lg:col-span-3 pt-2'>
+                  <button class='bg-slate-900 hover:bg-slate-800 text-white font-medium px-5 py-2.5 rounded-lg text-sm transition shadow-xs'>Save Employee Record</button>
+                </div>
+              </form>
+            </div>
+            """
+
+        search_bar = f"""
+        <div class='flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6'>
+          <form class='flex items-center gap-2 max-w-md w-full' method='get'>
+            <div class='relative flex-1'>
+              <input name='q' value='{self._e(keyword)}' placeholder='Search by name, ID, department...' class='w-full pl-9 pr-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-slate-900 focus:outline-none'>
+              <svg class='w-4 h-4 text-slate-400 absolute left-3 top-2.5' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z'/></svg>
+            </div>
+            <button class='bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition'>Search</button>
+            {f"<a href='/employees' class='text-xs text-slate-500 hover:text-slate-800 underline px-2'>Reset</a>" if keyword else ""}
+          </form>
+          <div class='text-xs font-medium text-slate-500'>Showing {len(data)} employee record(s)</div>
+        </div>
+        """
+
+        content = f"{search_bar}{add_form}<div class='space-y-3'><h2 class='text-sm font-bold text-slate-900 uppercase tracking-wider'>Directory Listing</h2>{self._table(['ID', 'Name', 'Email', 'Phone', 'Department', 'Designation', 'Actions'], rows)}</div>"
         return self._page("Employees", content, current, session)
 
     # ------------------------ Attendance and leave --------------------------
     def _employee_options(self, selected: Optional[str] = None) -> str:
-        return "".join(f"<option value='{self._e(item['id'])}'{' selected' if item['id'] == selected else ''}>{self._e(item['id'])} — {self._e(item['name'])}</option>" for item in employees.get_all_employees())
+        return "".join(
+            f"<option value='{self._e(item['id'])}'{' selected' if item['id'] == selected else ''}>{self._e(item['id'])} &mdash; {self._e(item['name'])}</option>"
+            for item in employees.get_all_employees()
+        )
 
     def _attendance(self, request: dict, session: BrowserSession, current):
         allowed = self.auth.has_permission(session.auth_token or "", Permission.MARK_ATTENDANCE) or self.auth.has_permission(session.auth_token or "", Permission.APPLY_LEAVE)
@@ -291,16 +655,25 @@ class EmployeeWebApp:
                     employee_id = self._value(request, "employee_id") if is_admin else (current.employee_id or "")
                     if not employees.get_employee_by_id(employee_id):
                         raise ValueError("Select a valid employee record.")
-                    self.attendance.mark_attendance(employee_id, datetime.strptime(self._value(request, "attendance_date"), "%Y-%m-%d").date(), self._value(request, "status"))
-                    return self._redirect("/attendance", session, "Attendance was recorded.")
+                    self.attendance.mark_attendance(
+                        employee_id,
+                        datetime.strptime(self._value(request, "attendance_date"), "%Y-%m-%d").date(),
+                        self._value(request, "status"),
+                    )
+                    return self._redirect("/attendance", session, "Attendance entry recorded successfully.")
                 if action == "leave":
                     if (blocked := self._require(session, current, Permission.APPLY_LEAVE)):
                         return blocked
                     employee_id = current.employee_id or ""
                     if not employees.get_employee_by_id(employee_id):
                         raise ValueError("Your account must be linked to a valid employee ID before applying for leave.")
-                    self.leaves.apply_leave(employee_id, datetime.strptime(self._value(request, "start_date"), "%Y-%m-%d").date(), datetime.strptime(self._value(request, "end_date"), "%Y-%m-%d").date(), self._value(request, "reason"))
-                    return self._redirect("/attendance", session, "Leave request submitted.")
+                    self.leaves.apply_leave(
+                        employee_id,
+                        datetime.strptime(self._value(request, "start_date"), "%Y-%m-%d").date(),
+                        datetime.strptime(self._value(request, "end_date"), "%Y-%m-%d").date(),
+                        self._value(request, "reason"),
+                    )
+                    return self._redirect("/attendance", session, "Leave application submitted.")
                 if action in {"approve", "reject"}:
                     if (blocked := self._require(session, current, Permission.APPROVE_LEAVE if action == "approve" else Permission.REJECT_LEAVE)):
                         return blocked
@@ -310,26 +683,148 @@ class EmployeeWebApp:
                 raise ValueError("Unsupported attendance action.")
             except (ValueError, DuplicateAttendanceError, LeaveRequestNotFoundError) as exc:
                 return self._redirect("/attendance", session, str(exc), "error")
+
         attendance_data = self.attendance.get_all_attendance()
         leave_data = self.leaves.get_leave_requests()
         if not is_admin:
             attendance_data = [item for item in attendance_data if item.employee_id == current.employee_id]
             leave_data = [item for item in leave_data if item.employee_id == current.employee_id]
-        attendance_rows = [[record.employee_id, self._employee_name(record.employee_id), record.date, record.status] for record in attendance_data]
+
+        attendance_rows = []
+        for record in attendance_data:
+            st = record.status
+            st_badge = (
+                "<span class='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200'>Present</span>"
+                if st == "Present"
+                else "<span class='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200'>Absent</span>"
+            )
+            attendance_rows.append([
+                f"<span class='font-mono text-xs font-medium text-slate-700'>{record.employee_id}</span>",
+                self._employee_name(record.employee_id),
+                str(record.date),
+                st_badge,
+            ])
+
         leave_rows = []
         for record in leave_data:
             actions = ""
             if is_admin and record.status == "Pending":
-                actions = f"<form method='post' class='inline'>{self._csrf(session)}<input type='hidden' name='action' value='approve'><input type='hidden' name='request_id' value='{self._e(record.request_id)}'><button>Approve</button></form><form method='post' class='inline'>{self._csrf(session)}<input type='hidden' name='action' value='reject'><input type='hidden' name='request_id' value='{self._e(record.request_id)}'><button class='danger'>Reject</button></form>"
-            leave_rows.append([record.request_id, record.employee_id, record.start_date, record.end_date, record.reason, record.status, actions])
+                actions = f"""
+                <div class='flex items-center gap-1.5'>
+                  <form method='post' class='inline'>
+                    {self._csrf(session)}
+                    <input type='hidden' name='action' value='approve'>
+                    <input type='hidden' name='request_id' value='{self._e(record.request_id)}'>
+                    <button class='bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-2.5 py-1 rounded-md transition shadow-xs'>Approve</button>
+                  </form>
+                  <form method='post' class='inline'>
+                    {self._csrf(session)}
+                    <input type='hidden' name='action' value='reject'>
+                    <input type='hidden' name='request_id' value='{self._e(record.request_id)}'>
+                    <button class='bg-rose-600 hover:bg-rose-700 text-white text-xs font-medium px-2.5 py-1 rounded-md transition shadow-xs'>Reject</button>
+                  </form>
+                </div>
+                """
+            st = record.status
+            if st == "Approved":
+                st_badge = "<span class='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200'>Approved</span>"
+            elif st == "Rejected":
+                st_badge = "<span class='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200'>Rejected</span>"
+            else:
+                st_badge = "<span class='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200'>Pending</span>"
+
+            leave_rows.append([
+                f"<span class='font-mono text-xs font-semibold text-slate-700'>{record.request_id}</span>",
+                self._employee_name(record.employee_id),
+                str(record.start_date),
+                str(record.end_date),
+                record.reason,
+                st_badge,
+                actions,
+            ])
+
         mark_form = ""
         if self.auth.has_permission(session.auth_token or "", Permission.MARK_ATTENDANCE):
-            select = f"<select name='employee_id'>{self._employee_options()}</select>" if is_admin else f"<b>{self._e(current.employee_id or 'Unlinked account')}</b>"
-            mark_form = f"<section class='panel'><h2>Record attendance</h2><form method='post' class='grid-form'>{self._csrf(session)}<input type='hidden' name='action' value='mark'><label>Employee {select}</label><label>Date <input name='attendance_date' type='date' value='{date.today().isoformat()}' required></label><label>Status <select name='status'><option>Present</option><option>Absent</option></select></label><button>Record attendance</button></form></section>"
+            select = (
+                f"<select name='employee_id' class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-slate-900 focus:outline-none'>{self._employee_options()}</select>"
+                if is_admin
+                else f"<div class='px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-800'>{self._e(current.employee_id or 'Unlinked account')}</div>"
+            )
+            mark_form = f"""
+            <div class='bg-white p-6 rounded-2xl border border-slate-200 shadow-xs'>
+              <h2 class='text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2'>
+                <span class='w-2 h-2 rounded-full bg-emerald-500'></span>
+                Record Attendance
+              </h2>
+              <form method='post' class='space-y-4'>
+                {self._csrf(session)}
+                <input type='hidden' name='action' value='mark'>
+                <div>
+                  <label class='block text-xs font-semibold text-slate-700 mb-1'>Employee</label>
+                  {select}
+                </div>
+                <div>
+                  <label class='block text-xs font-semibold text-slate-700 mb-1'>Date</label>
+                  <input name='attendance_date' type='date' value='{date.today().isoformat()}' required class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none'>
+                </div>
+                <div>
+                  <label class='block text-xs font-semibold text-slate-700 mb-1'>Status</label>
+                  <select name='status' class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-slate-900 focus:outline-none'>
+                    <option value='Present'>Present</option>
+                    <option value='Absent'>Absent</option>
+                  </select>
+                </div>
+                <button class='w-full bg-slate-900 hover:bg-slate-800 text-white font-medium py-2.5 px-4 rounded-lg text-sm transition shadow-xs'>Mark Attendance</button>
+              </form>
+            </div>
+            """
+
         leave_form = ""
         if self.auth.has_permission(session.auth_token or "", Permission.APPLY_LEAVE):
-            leave_form = f"<section class='panel'><h2>Apply for leave</h2><form method='post' class='grid-form'>{self._csrf(session)}<input type='hidden' name='action' value='leave'><label>Start date <input name='start_date' type='date' value='{date.today().isoformat()}' required></label><label>End date <input name='end_date' type='date' value='{date.today().isoformat()}' required></label><label class='wide'>Reason <input name='reason' maxlength='300' required></label><button>Submit leave request</button></form></section>"
-        content = f"{mark_form}{leave_form}<section class='panel'><h2>Attendance log</h2>{self._table(['Employee ID', 'Employee', 'Date', 'Status'], attendance_rows)}</section><section class='panel'><h2>Leave requests</h2>{self._table(['Request', 'Employee', 'Start', 'End', 'Reason', 'Status', 'Actions'], leave_rows)}</section>"
+            leave_form = f"""
+            <div class='bg-white p-6 rounded-2xl border border-slate-200 shadow-xs'>
+              <h2 class='text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2'>
+                <span class='w-2 h-2 rounded-full bg-indigo-500'></span>
+                Apply for Leave
+              </h2>
+              <form method='post' class='space-y-4'>
+                {self._csrf(session)}
+                <input type='hidden' name='action' value='leave'>
+                <div class='grid grid-cols-2 gap-3'>
+                  <div>
+                    <label class='block text-xs font-semibold text-slate-700 mb-1'>Start Date</label>
+                    <input name='start_date' type='date' value='{date.today().isoformat()}' required class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none'>
+                  </div>
+                  <div>
+                    <label class='block text-xs font-semibold text-slate-700 mb-1'>End Date</label>
+                    <input name='end_date' type='date' value='{date.today().isoformat()}' required class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none'>
+                  </div>
+                </div>
+                <div>
+                  <label class='block text-xs font-semibold text-slate-700 mb-1'>Reason for Leave</label>
+                  <input name='reason' maxlength='300' required placeholder='e.g. Medical appointment, family event' class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none'>
+                </div>
+                <button class='w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-4 rounded-lg text-sm transition shadow-xs'>Submit Leave Request</button>
+              </form>
+            </div>
+            """
+
+        content = f"""
+        <div class='space-y-8'>
+          <div class='grid grid-cols-1 lg:grid-cols-2 gap-8'>
+            {mark_form}
+            {leave_form}
+          </div>
+          <div class='space-y-3'>
+            <h2 class='text-sm font-bold text-slate-900 uppercase tracking-wider'>Attendance History</h2>
+            {self._table(['Employee ID', 'Employee Name', 'Date', 'Status'], attendance_rows)}
+          </div>
+          <div class='space-y-3'>
+            <h2 class='text-sm font-bold text-slate-900 uppercase tracking-wider'>Leave Applications & Approvals</h2>
+            {self._table(['Request ID', 'Employee', 'Start Date', 'End Date', 'Reason', 'Status', 'Actions'], leave_rows)}
+          </div>
+        </div>
+        """
         return self._page("Attendance & leave", content, current, session)
 
     # ----------------------------- Payroll ----------------------------------
@@ -349,12 +844,21 @@ class EmployeeWebApp:
                 person = employees.get_employee_by_id(employee_id)
                 if not person:
                     raise ValueError("Select a valid employee.")
-                payslip, _ = PayslipGenerator.generate_payslip(employee_id, person["name"], self._value(request, "pay_period"), float(self._value(request, "basic_salary")), float(self._value(request, "allowances") or "0"), float(self._value(request, "deductions") or "0"), currency="INR")
+                payslip, _ = PayslipGenerator.generate_payslip(
+                    employee_id,
+                    person["name"],
+                    self._value(request, "pay_period"),
+                    float(self._value(request, "basic_salary")),
+                    float(self._value(request, "allowances") or "0"),
+                    float(self._value(request, "deductions") or "0"),
+                    currency="INR",
+                )
                 database.payroll_upsert(employee_id, payslip.pay_period, payslip.basic_salary, payslip.allowances, payslip.deductions)
                 result = self._payslip_html(payslip) + self._payslip_download_link(payslip)
-                self._flash(session, "success", "Payslip generated and payroll record saved.")
+                self._flash(session, "success", "Payslip generated and payroll record recorded successfully.")
             except (ValueError, PayrollError) as exc:
                 self._flash(session, "error", str(exc))
+
         requested = request["query"].get("employee_id", [""])[0]
         if can_view and requested:
             if requested != current.employee_id:
@@ -365,25 +869,116 @@ class EmployeeWebApp:
                     person = employees.get_employee_by_id(requested)
                     if not record or not person:
                         raise PayrollError("Payslip not found.")
-                    payslip, _ = PayslipGenerator.generate_payslip(requested, person["name"], record["pay_period"], record["basic_salary"], record["allowances"], record["deductions"], currency="INR")
+                    payslip, _ = PayslipGenerator.generate_payslip(
+                        requested,
+                        person["name"],
+                        record["pay_period"],
+                        record["basic_salary"],
+                        record["allowances"],
+                        record["deductions"],
+                        currency="INR",
+                    )
                     result = self._payslip_html(payslip) + self._payslip_download_link(payslip)
                 except PayrollError:
                     self._flash(session, "error", "No payslip was found for that pay period.")
+
         processor = ""
         if can_process:
-            processor = f"""<section class='panel'><h2>Generate payslip</h2><form method='post' class='grid-form'>{self._csrf(session)}<label>Employee <select name='employee_id'>{self._employee_options()}</select></label><label>Pay period <input name='pay_period' value='{date.today().strftime('%Y-%m')}' pattern='[0-9]{{4}}-[0-9]{{2}}' required></label><label>Basic salary (₹) <input name='basic_salary' type='number' min='0' step='.01' required></label><label>Allowances (₹) <input name='allowances' type='number' min='0' step='.01' value='0'></label><label>Deductions (₹) <input name='deductions' type='number' min='0' step='.01' value='0'></label><button>Generate payslip</button></form></section>"""
+            processor = f"""
+            <div class='bg-white p-6 rounded-2xl border border-slate-200 shadow-xs mb-8'>
+              <h2 class='text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2'>
+                <span class='w-2 h-2 rounded-full bg-emerald-500'></span>
+                Generate &amp; Record Payslip
+              </h2>
+              <form method='post' class='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'>
+                {self._csrf(session)}
+                <div>
+                  <label class='block text-xs font-semibold text-slate-700 mb-1'>Select Employee</label>
+                  <select name='employee_id' class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-slate-900 focus:outline-none'>{self._employee_options()}</select>
+                </div>
+                <div>
+                  <label class='block text-xs font-semibold text-slate-700 mb-1'>Pay Period (YYYY-MM)</label>
+                  <input name='pay_period' value='{date.today().strftime('%Y-%m')}' pattern='[0-9]{{4}}-[0-9]{{2}}' required class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none'>
+                </div>
+                <div>
+                  <label class='block text-xs font-semibold text-slate-700 mb-1'>Basic Salary (₹)</label>
+                  <input name='basic_salary' type='number' min='0' step='.01' required placeholder='65000' class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none'>
+                </div>
+                <div>
+                  <label class='block text-xs font-semibold text-slate-700 mb-1'>Allowances (₹)</label>
+                  <input name='allowances' type='number' min='0' step='.01' value='0' class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none'>
+                </div>
+                <div>
+                  <label class='block text-xs font-semibold text-slate-700 mb-1'>Deductions (₹)</label>
+                  <input name='deductions' type='number' min='0' step='.01' value='0' class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none'>
+                </div>
+                <div class='sm:col-span-2 lg:col-span-1 flex items-end'>
+                  <button class='w-full bg-slate-900 hover:bg-slate-800 text-white font-medium py-2.5 px-4 rounded-lg text-sm transition shadow-xs'>Compute &amp; Save</button>
+                </div>
+              </form>
+            </div>
+            """
+
         own = ""
         if can_view:
-            own = f"<section class='panel'><h2>My payslip</h2><form method='get' class='search'><input type='hidden' name='employee_id' value='{self._e(current.employee_id or '')}'><label>Pay period <input name='period' value='{date.today().strftime('%Y-%m')}' pattern='[0-9]{{4}}-[0-9]{{2}}'></label><button>View payslip</button></form></section>"
+            own = f"""
+            <div class='bg-white p-6 rounded-2xl border border-slate-200 shadow-xs mb-8'>
+              <h2 class='text-sm font-bold text-slate-900 uppercase tracking-wider mb-3'>View My Digital Payslip</h2>
+              <form method='get' class='flex flex-col sm:flex-row items-stretch sm:items-center gap-3'>
+                <input type='hidden' name='employee_id' value='{self._e(current.employee_id or '')}'>
+                <div class='flex items-center gap-2'>
+                  <label class='text-xs font-semibold text-slate-700'>Pay Period:</label>
+                  <input name='period' value='{date.today().strftime('%Y-%m')}' pattern='[0-9]{{4}}-[0-9]{{2}}' class='px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none'>
+                </div>
+                <button class='bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition'>Fetch Statement</button>
+              </form>
+            </div>
+            """
         content = f"{processor}{own}{result}"
         return self._page("Payroll & payslips", content, current, session)
 
     def _payslip_html(self, payslip) -> str:
-        values = [("Employee", payslip.employee_name), ("Employee ID", payslip.employee_id), ("Pay period", payslip.pay_period), ("Basic salary", f"₹ {payslip.basic_salary:,.2f}"), ("Allowances", f"₹ {payslip.allowances:,.2f}"), ("Gross salary", f"₹ {payslip.gross_salary:,.2f}"), ("Deductions", f"₹ {payslip.deductions:,.2f}"), ("Net salary", f"₹ {payslip.net_salary:,.2f}")]
-        return "<section class='panel payslip'><h2>Payslip</h2>" + "".join(f"<div><span>{self._e(key)}</span><b>{self._e(value)}</b></div>" for key, value in values) + "</section>"
+        values = [
+            ("Employee Name", payslip.employee_name),
+            ("Employee ID", payslip.employee_id),
+            ("Pay Period", payslip.pay_period),
+            ("Basic Salary", f"₹ {payslip.basic_salary:,.2f}"),
+            ("Allowances", f"₹ {payslip.allowances:,.2f}"),
+            ("Gross Salary", f"₹ {payslip.gross_salary:,.2f}"),
+            ("Deductions", f"₹ {payslip.deductions:,.2f}"),
+        ]
+        items_html = "".join(
+            f"<div class='flex justify-between py-2 border-b border-slate-100 text-sm'><span class='text-slate-500'>{self._e(k)}</span><span class='font-medium text-slate-800'>{self._e(v)}</span></div>"
+            for k, v in values
+        )
+        return f"""
+        <div class='bg-white rounded-2xl border border-slate-200 shadow-xs p-6 max-w-lg mb-6'>
+          <div class='flex items-center justify-between pb-4 border-b border-slate-200'>
+            <div>
+              <span class='text-xs font-semibold text-indigo-600 uppercase tracking-wider'>Official Pay Statement</span>
+              <h3 class='text-lg font-bold text-slate-900'>Employee Payslip</h3>
+            </div>
+            <span class='px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200'>{self._e(payslip.pay_period)}</span>
+          </div>
+          <div class='mt-4 divide-y divide-slate-100'>
+            {items_html}
+          </div>
+          <div class='mt-4 pt-3 border-t border-slate-200 flex justify-between items-center'>
+            <span class='text-base font-bold text-slate-900'>Net Payable Salary</span>
+            <span class='text-xl font-black text-emerald-600'>₹ {payslip.net_salary:,.2f}</span>
+          </div>
+        </div>
+        """
 
     def _payslip_download_link(self, payslip) -> str:
-        return f"<a class='button' href='/download?type=payslip&amp;employee_id={self._e(payslip.employee_id)}&amp;period={self._e(payslip.pay_period)}'>Download payslip (.txt)</a>"
+        return f"""
+        <div class='mb-8'>
+          <a class='inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition shadow-xs' href='/download?type=payslip&amp;employee_id={self._e(payslip.employee_id)}&amp;period={self._e(payslip.pay_period)}'>
+            <svg class='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4'/></svg>
+            Download Payslip Document (.txt)
+          </a>
+        </div>
+        """
 
     # -------------------------- Reports and users ---------------------------
     def _reports(self, request: dict, session: BrowserSession, current):
@@ -394,17 +989,42 @@ class EmployeeWebApp:
         try:
             if report_type == "attendance":
                 text = ReportService.format_attendance_report(ReportService.generate_attendance_report(self._attendance_report_records()))
-                title = "Attendance analytics"
+                title = "Monthly Attendance Analytics"
             elif report_type == "salary":
                 text = ReportService.format_salary_report(ReportService.generate_salary_report(database.payroll_list(), currency="INR"))
-                title = "Salary analytics"
+                title = "Financial Salary Analytics"
             else:
                 text = ReportService.format_employee_report(ReportService.generate_employee_report(employees.get_all_employees()))
-                title = "Headcount & demographics"
+                title = "Headcount & Workforce Demographics"
         except PayrollError as exc:
             text, title = str(exc), "Report unavailable"
-        controls = f"<div class='tabs'><a href='/reports?type=headcount'>Headcount</a><a href='/reports?type=attendance'>Attendance</a><a href='/reports?type=salary'>Salary</a><a href='/download?type=report&amp;report={self._e(report_type)}'>Download report (.txt)</a></div>"
-        return self._page("Reports", f"{controls}<section class='panel'><h2>{self._e(title)}</h2><pre>{self._e(text)}</pre></section>", current, session)
+
+        controls = f"""
+        <div class='flex flex-wrap items-center justify-between gap-3 mb-6'>
+          <div class='flex flex-wrap gap-2'>
+            <a href='/reports?type=headcount' class='px-3.5 py-1.5 rounded-lg text-xs font-semibold transition {'bg-slate-900 text-white shadow-xs' if report_type == 'headcount' else 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'}'>👥 Headcount & Demographics</a>
+            <a href='/reports?type=attendance' class='px-3.5 py-1.5 rounded-lg text-xs font-semibold transition {'bg-slate-900 text-white shadow-xs' if report_type == 'attendance' else 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'}'>🗓️ Attendance Analytics</a>
+            <a href='/reports?type=salary' class='px-3.5 py-1.5 rounded-lg text-xs font-semibold transition {'bg-slate-900 text-white shadow-xs' if report_type == 'salary' else 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'}'>💵 Financial Salary Analytics</a>
+          </div>
+          <a href='/download?type=report&amp;report={self._e(report_type)}' class='inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold px-3.5 py-1.5 rounded-lg transition shadow-xs'>
+            <svg class='w-3.5 h-3.5 text-slate-500' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4'/></svg>
+            Download Report (.txt)
+          </a>
+        </div>
+        """
+        viewer = f"""
+        <div class='bg-slate-900 rounded-2xl border border-slate-800 p-6 shadow-lg'>
+          <div class='flex items-center justify-between pb-3 mb-4 border-b border-slate-800 text-xs text-slate-400'>
+            <span class='font-semibold text-slate-200 flex items-center gap-2'>
+              <span class='w-2 h-2 rounded-full bg-emerald-400'></span>
+              {self._e(title)}
+            </span>
+            <span>Generated live from SQLite database</span>
+          </div>
+          <pre class='text-sky-300 font-mono text-xs md:text-sm leading-relaxed overflow-x-auto'>{self._e(text)}</pre>
+        </div>
+        """
+        return self._page("Reports", f"{controls}{viewer}", current, session)
 
     def _download(self, request: dict, session: BrowserSession, current):
         """Return text documents with the same RBAC rules as their browser views."""
@@ -434,7 +1054,15 @@ class EmployeeWebApp:
                 person = employees.get_employee_by_id(employee_id)
                 if not record or not person:
                     raise PayrollError("Payslip not found.")
-                _, text = PayslipGenerator.generate_payslip(employee_id, person["name"], period, record["basic_salary"], record["allowances"], record["deductions"], currency="INR")
+                _, text = PayslipGenerator.generate_payslip(
+                    employee_id,
+                    person["name"],
+                    period,
+                    record["basic_salary"],
+                    record["allowances"],
+                    record["deductions"],
+                    currency="INR",
+                )
                 filename = f"payslip-{employee_id}-{period}.txt"
             else:
                 raise ValueError("Unknown document type.")
@@ -454,15 +1082,60 @@ class EmployeeWebApp:
                 employee_id = self._value(request, "employee_id")
                 if not employees.get_employee_by_id(employee_id):
                     raise ValueError("Create the employee record before creating its account.")
-                # Browser users are deliberately created as Employee accounts;
-                # administrative privilege is never self-service.
+                # Browser users are created as Employee accounts
                 user = self.auth.register_user(self._value(request, "username"), self._value(request, "password"), Role.EMPLOYEE, employee_id)
                 return self._redirect("/users", session, f"Account for {user.username} was created.")
             except (AuthError, ValueError) as exc:
                 return self._redirect("/users", session, str(exc), "error")
-        rows = [[user.username, user.role, user.employee_id or "—", "Active" if user.is_active else "Disabled"] for user in self.auth.list_all_users()]
-        form = f"""<section class='panel'><h2>Create employee account</h2><form method='post' class='grid-form'>{self._csrf(session)}<label>Employee <select name='employee_id'>{self._employee_options()}</select></label><label>Username <input name='username' pattern='[A-Za-z0-9_.-]{{3,50}}' required></label><label class='wide'>Temporary password <input name='password' type='password' minlength='12' required><small>At least 12 characters and three of: lowercase, uppercase, number, symbol.</small></label><button>Create employee account</button></form></section>"""
-        return self._page("User accounts", form + f"<section class='panel'><h2>Accounts</h2>{self._table(['Username', 'Role', 'Employee ID', 'Status'], rows)}</section>", current, session)
+
+        rows = []
+        for user in self.auth.list_all_users():
+            status_badge = (
+                "<span class='inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200'>Active</span>"
+                if user.is_active
+                else "<span class='inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200'>Disabled</span>"
+            )
+            role_badge = (
+                "<span class='inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200'>Admin</span>"
+                if user.role == "Admin"
+                else "<span class='inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200'>Employee</span>"
+            )
+            rows.append([
+                f"<span class='font-medium text-slate-900'>{user.username}</span>",
+                role_badge,
+                f"<span class='font-mono text-xs text-slate-700'>{user.employee_id or '—'}</span>",
+                status_badge,
+            ])
+
+        form = f"""
+        <div class='bg-white p-6 rounded-2xl border border-slate-200 shadow-xs mb-8'>
+          <h2 class='text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2'>
+            <span class='w-2 h-2 rounded-full bg-indigo-500'></span>
+            Create Employee Account
+          </h2>
+          <form method='post' class='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'>
+            {self._csrf(session)}
+            <div>
+              <label class='block text-xs font-semibold text-slate-700 mb-1'>Link to Employee</label>
+              <select name='employee_id' class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-slate-900 focus:outline-none'>{self._employee_options()}</select>
+            </div>
+            <div>
+              <label class='block text-xs font-semibold text-slate-700 mb-1'>Username *</label>
+              <input name='username' pattern='[A-Za-z0-9_.-]{{3,50}}' required placeholder='e.g. asharma' class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none'>
+            </div>
+            <div>
+              <label class='block text-xs font-semibold text-slate-700 mb-1'>Temporary Password *</label>
+              <input name='password' type='password' minlength='12' required placeholder='12+ chars, mixed' class='w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none'>
+            </div>
+            <div class='sm:col-span-2 lg:col-span-3 flex items-center justify-between pt-2'>
+              <p class='text-xs text-slate-500'>Password policy: 12+ characters and at least three of: lowercase, uppercase, number, symbol.</p>
+              <button class='bg-slate-900 hover:bg-slate-800 text-white font-medium px-5 py-2.5 rounded-lg text-sm transition shadow-xs'>Create Account</button>
+            </div>
+          </form>
+        </div>
+        """
+        content = f"{form}<div class='space-y-3'><h2 class='text-sm font-bold text-slate-900 uppercase tracking-wider'>User Accounts</h2>{self._table(['Username', 'Role', 'Linked Employee', 'Status'], rows)}</div>"
+        return self._page("User accounts", content, current, session)
 
     # --------------------------- Service setup ------------------------------
     def _employee_name(self, employee_id: str) -> str:
@@ -483,7 +1156,45 @@ class EmployeeWebApp:
 
 
 CSS = """
-:root{--ink:#172033;--brand:#172b4d;--blue:#1769aa;--line:#dbe3ee;--bg:#f4f7fb;--danger:#b42318;--good:#047857}*{box-sizing:border-box}body{margin:0;background:var(--bg);font:15px system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--ink)}header{min-height:64px;background:var(--brand);color:white;display:flex;align-items:center;padding:0 4vw;gap:24px}.brand{font-weight:800;font-size:18px;color:white;text-decoration:none}nav{display:flex;gap:16px;flex:1}nav a{color:#dbeafe;text-decoration:none;font-size:14px}.account{display:flex;align-items:center;gap:10px}.user{font-size:13px}.inline{display:inline}.quiet{background:transparent;border:1px solid #8da0ba;color:white}.button{display:inline-block;padding:9px 13px;border-radius:7px;text-decoration:none}main{max-width:1180px;margin:0 auto;padding:28px 20px 48px}.title h1{font-size:27px;margin:0 0 18px}.lead{font-size:17px;line-height:1.55}.panel,.auth-card{background:white;border:1px solid var(--line);border-radius:10px;padding:20px;margin:18px 0;box-shadow:0 1px 2px #12213a0b}.auth-card{max-width:470px;margin:46px auto}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.card{background:white;border:1px solid var(--line);padding:20px;border-radius:10px}.card span{display:block;color:#58657a}.card strong{display:block;font-size:31px;margin-top:5px}.stack label,.grid-form label{display:flex;flex-direction:column;gap:6px;font-weight:650}.stack{display:grid;gap:15px}.grid-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:end}.wide{grid-column:span 2}input,select,button{font:inherit;border-radius:6px;padding:9px 10px;border:1px solid #aebdce;background:white;color:var(--ink)}button{background:var(--blue);border-color:var(--blue);color:white;cursor:pointer;font-weight:700;width:max-content}.danger{background:var(--danger);border-color:var(--danger)}.notice{padding:11px 14px;border-radius:7px;margin:12px 0}.notice.success{background:#e8f7ef;color:#075c39}.notice.error{background:#fff0ef;color:#8e1b12}.search{display:flex;gap:9px;align-items:end;margin-bottom:16px}.search input{min-width:280px}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:11px 10px;border-bottom:1px solid var(--line);vertical-align:top}th{font-size:12px;color:#536174;text-transform:uppercase;letter-spacing:.04em}details{min-width:350px}.compact{display:grid;grid-template-columns:repeat(2,1fr);gap:5px;margin:8px 0}.compact button{grid-column:span 2}small,.hint,.permissions{color:#5f6b7a;font-size:13px}.tabs{display:flex;gap:10px}.tabs a{background:white;border:1px solid var(--line);padding:8px 12px;border-radius:6px;text-decoration:none;color:var(--blue);font-weight:700}pre{white-space:pre-wrap;overflow:auto;background:#111c2d;color:#d9ebff;padding:18px;border-radius:7px}.payslip{max-width:560px}.payslip div{display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:10px 0}.payslip div:last-child{font-size:18px;color:var(--good)}@media(max-width:760px){header{flex-wrap:wrap;padding:14px 20px;gap:12px}nav{order:3;flex-basis:100%;overflow:auto}.cards,.grid-form{grid-template-columns:1fr}.wide{grid-column:span 1}.search{align-items:stretch;flex-direction:column}.search input{min-width:0}.user{display:none}}
+/* Enhanced companion utilities for Tailwind CDN */
+html {
+  scroll-behavior: smooth;
+}
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+details > summary::-webkit-details-marker {
+  display: none;
+}
+details > summary::after {
+  content: "▾";
+  margin-left: 4px;
+}
+details[open] > summary::after {
+  content: "▴";
+}
+pre {
+  tab-size: 2;
+}
+@media print {
+  header, footer, nav, button {
+    display: none !important;
+  }
+  body {
+    background: white !important;
+  }
+}
 """
 
 
